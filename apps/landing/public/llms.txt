@@ -15,6 +15,7 @@
 - [Estadísticas de uso](https://firmar.ec/estadisticas/): volumen agregado público de documentos firmados y verificados, sin datos personales.
 - [Preguntas frecuentes](https://firmar.ec/faq/): cómo firmar, qué es PAdES, qué es .p12, troubleshooting, validez legal.
 - [Glosario](https://firmar.ec/glosario/): 18+ términos (ACE, CMS, ECI, PAdES, .p12, OCSP, CRL, TSA, TSL, X.509, LCE, LOPDP).
+- [Respuestas](https://firmar.ec/respuestas/): respuestas directas a preguntas concretas sobre firma electrónica en Ecuador, una por página.
 
 ## Páginas temáticas
 

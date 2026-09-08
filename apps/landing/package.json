@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && node scripts/check-size-claims.mjs && node --experimental-strip-types scripts/check-announced-urls.mjs && astro build && node scripts/check-llms.mjs && node scripts/check-faq-visibility.mjs && node scripts/check-nav-links.mjs && node ../../scripts/check-wa-number.mjs dist",
+    "build": "astro check && node scripts/check-size-claims.mjs && node --experimental-strip-types scripts/check-announced-urls.mjs && astro build && node scripts/check-llms.mjs && node scripts/check-faq-visibility.mjs && node scripts/check-answer-pages.mjs && node scripts/check-nav-links.mjs && node ../../scripts/check-wa-number.mjs dist",
     "preview": "astro preview --host 0.0.0.0",
     "typecheck": "astro check",
     "og:aliases": "node --experimental-strip-types scripts/generate-og-aliases.mjs"

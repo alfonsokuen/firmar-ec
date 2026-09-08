@@ -1,0 +1,113 @@
+---
+import { getCollection, render } from 'astro:content';
+import ArticleSeo from '../../layouts/ArticleSeo.astro';
+import { SITE, faqPage } from '../../lib/jsonld.ts';
+
+// Una respuesta = una pregunta real que un motor generativo ya responde
+// citando a otro. Lo que la hace citable es que la respuesta esté ARRIBA y
+// VISIBLE: publicar FAQPage sin pintar nada deja el hueco abierto. La guarda
+// `scripts/check-answer-pages.mjs` verifica exactamente eso sobre el HTML
+// construido, no sobre el .md — un check sobre el fuente daría verde aunque
+// esta plantilla dejara de pintar el h1, la respuesta o el acordeón.
+//
+// CUATRO INVARIANTES QUE ESA GUARDA EXIGE, y por los que este fichero está
+// escrito como está:
+//   1. EXACTAMENTE un <h1>, y su texto es `question` literal.
+//   2. `answer` visible ANTES del primer <h2> (por eso va fuera de <Content/>,
+//      cuyo cuerpo abre con "## La respuesta corta").
+//   3. EXACTAMENTE un FAQPage JSON-LD en toda la página.
+//   4. El hub /respuestas/ enlaza cada página con un href de verdad.
+// Romper cualquiera rompe el build, que es donde queremos enterarnos.
+
+export async function getStaticPaths() {
+  const entries = await getCollection('respuestas');
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const data = entry.data;
+
+// Rutas internas que `relatedSlugs` puede nombrar, con la etiqueta a pintar.
+// Las páginas de contenido siguen la convención `content/pages/es/<slug>.md`
+// ↔ `/<slug>/`. TOLERANTE A PROPÓSITO: un slug que ya no existe se descarta en
+// silencio. Si rompiera el build, borrar una respuesta —que es justo la
+// reversión del bot, un PR que elimina el .md— tumbaría el sitio entero y
+// dejaría la marcha atrás bloqueada.
+const paginas = await getCollection('pages', (e) => e.data.lang === 'es');
+const respuestas = await getCollection('respuestas');
+const rutasConocidas = new Map<string, string>([
+  ...paginas.map((p) => [`/${p.id.replace(/^es\//, '')}/`, p.data.title] as [string, string]),
+  ...respuestas.map((r) => [`/respuestas/${r.id}/`, r.data.title] as [string, string]),
+]);
+
+const related = data.relatedSlugs
+  .filter((href: string) => href !== `/respuestas/${entry.id}/` && rutasConocidas.has(href))
+  .map((href: string) => ({ href, title: rutasConocidas.get(href) as string }));
+
+// `pubDate`/`updatedDate` son Date (z.coerce.date); ArticleSeo espera la fecha
+// en ISO corta, igual que el resto de páginas del sitio.
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+
+const articleProps = {
+  title: data.title,
+  description: data.description,
+  // `respuestas` no está en ROUTE_MAP y no debe estarlo: estas páginas son solo
+  // en español. `getHreflangsForRoute` devuelve null y Base lo trata como
+  // "sin hreflang", que es lo correcto — no rompe.
+  routeKey: 'respuestas',
+  h1: data.question,
+  datePublished: isoDay(data.pubDate),
+  ...(data.updatedDate !== undefined ? { dateModified: isoDay(data.updatedDate) } : {}),
+  breadcrumbs: [{ name: 'Respuestas', url: `${SITE.url}/respuestas/` }],
+  related,
+};
+---
+<ArticleSeo {...articleProps}>
+  {/* La respuesta directa, VISIBLE y por encima de cualquier <h2>. Es el
+      invariante 2 de la guarda y la razón de ser de la página.
+
+      DEUDA CONOCIDA — el párrafo sale DOS veces: el cuerpo que emite el motor
+      abre con `## La respuesta corta` seguido del mismo `answer`
+      (`domain/answerPage.ts`, `blocks = ['## ' + LEAD_HEADING, doc.answer]`),
+      así que se repite verbatim bajo el h2. Medido sobre el HTML construido, y
+      le pasa igual a idkmanager-web: es del contrato, no de esta plantilla.
+      No se arregla aquí porque las dos salidas obvias son malas: quitar este
+      párrafo rompe el invariante 2 (la respuesta quedaría BAJO el primer h2), y
+      cambiar `renderAnswerPageMarkdown` altera el fichero publicado y rompe el
+      drift-guard de toda página ya viva. La salida buena es que el motor deje
+      de repetir el `answer` en el cuerpo, coordinado con ese drift-guard. */}
+  <p class="lead text-lg leading-relaxed">{data.answer}</p>
+
+  <Content />
+
+  <section class="not-prose mt-14 pt-8 border-t border-ink-200 dark:border-ink-800">
+    <h2 class="font-display text-xl font-semibold leading-snug mb-4">Más sobre esta respuesta</h2>
+    <ol class="space-y-4">
+      {data.faq.map((item: { q: string; a: string }) => (
+        <li class="rounded-lg border border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-900 p-5">
+          <details class="group">
+            <summary class="cursor-pointer font-semibold text-base flex items-start gap-2 py-1 select-none">
+              <span class="i-lucide-chevron-right text-brand-500 mt-0.5 flex-shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] group-open:rotate-90" aria-hidden="true"></span>
+              <span>{item.q}</span>
+            </summary>
+            <div class="mt-3 text-sm text-ink-700 dark:text-ink-300">{item.a}</div>
+          </details>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  {/* Único FAQPage de la página (invariante 3), y declara SOLO lo que el
+      acordeón de arriba ya muestra. Va en el cuerpo, como el HowTo de
+      `como-firmar-pdf.astro`: ArticleSeo no acepta jsonld adicional. */}
+  <script
+    type="application/ld+json"
+    set:html={JSON.stringify(faqPage(data.faq.map((f: { q: string; a: string }) => ({ question: f.q, answer: f.a }))))}
+  ></script>
+</ArticleSeo>
+
+<style>
+  details summary { list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+</style>

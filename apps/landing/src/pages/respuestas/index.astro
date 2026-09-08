@@ -1,0 +1,53 @@
+---
+import { getCollection } from 'astro:content';
+import Page from '../../layouts/Page.astro';
+import { SITE } from '../../lib/jsonld.ts';
+
+// Hub de /respuestas/. NO es decorativo: sin un enlace real desde aquí, cada
+// respuesta nace huérfana y solo la ve el sitemap — un rastreador que llega por
+// el sitemap y no encuentra ruta interna la trata como página suelta. Por eso
+// la guarda de build exige que este hub contenga un `href` de verdad a cada
+// una, no basta con que la URL aparezca en el JSON-LD.
+
+const entries = (await getCollection('respuestas')).sort(
+  (a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime(),
+);
+
+const title = 'Respuestas';
+const description =
+  'Respuestas directas a preguntas concretas sobre firma electrónica en Ecuador: qué necesitas, cómo se hace y qué validez tiene.';
+
+const formatDate = (d: Date) =>
+  d.toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+---
+<Page
+  title={title}
+  description={description}
+  routeKey="respuestas"
+  h1={title}
+  breadcrumbs={[{ name: title, url: `${SITE.url}/respuestas/` }]}
+>
+  <p class="lead">{description}</p>
+
+  {entries.length === 0 ? (
+    <p class="text-ink-500 dark:text-ink-400">Todavía no hay respuestas publicadas.</p>
+  ) : (
+    <ul class="not-prose space-y-4 mt-8">
+      {entries.map((entry) => (
+        <li class="rounded-lg border border-ink-200 dark:border-ink-800 p-5">
+          <a class="group block" href={`/respuestas/${entry.id}/`}>
+            <h2 class="font-display text-lg font-semibold leading-snug group-hover:text-brand-500">
+              {entry.data.question}
+            </h2>
+            <p class="mt-2 text-sm text-ink-700 dark:text-ink-300">{entry.data.answer}</p>
+            <p class="mt-3 text-xs text-ink-500 dark:text-ink-400">
+              <time datetime={entry.data.pubDate.toISOString().slice(0, 10)}>
+                {formatDate(entry.data.pubDate)}
+              </time>
+            </p>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )}
+</Page>

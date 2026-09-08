@@ -83,6 +83,15 @@ const buyUrl = storeLink('footer');
         <li><a class="flex items-center py-1.5 min-h-11 md:min-h-8 hover:text-ink-900 dark:hover:text-ink-50 transition-colors" href={localizedUrl('seguridad', lang)}>{t('footer.seguridad')}</a></li>
         <li><a class="flex items-center py-1.5 min-h-11 md:min-h-8 hover:text-ink-900 dark:hover:text-ink-50 transition-colors" href={localizedUrl('contacto', lang)}>{t('footer.contacto')}</a></li>
         <li><a class="flex items-center py-1.5 min-h-11 md:min-h-8 hover:text-ink-900 dark:hover:text-ink-50 transition-colors" href={localizedUrl('glosario', lang)}>{t('footer.glosario')}</a></li>
+        {lang === 'es' && (
+          /* Solo en español: la sección no tiene versión en inglés, y por eso
+             tampoco está en ROUTE_MAP (el href va literal). Sin este enlace el
+             hub /respuestas/ solo lo alcanzan los breadcrumbs de sus propias
+             páginas —un grafo cerrado sobre sí mismo— más el sitemap y
+             llms.txt: el mismo argumento por el que existe el hub, un nivel
+             más arriba. */
+          <li><a class="flex items-center py-1.5 min-h-11 md:min-h-8 hover:text-ink-900 dark:hover:text-ink-50 transition-colors" href="/respuestas/">{t('footer.respuestas')}</a></li>
+        )}
         <li><a class="flex items-center py-1.5 min-h-11 md:min-h-8 hover:text-ink-900 dark:hover:text-ink-50 transition-colors" href={localizedUrl('estadisticas', lang)}>{t('footer.estadisticas')}</a></li>
         <li><a class="flex items-center py-1.5 min-h-11 md:min-h-8 hover:text-ink-900 dark:hover:text-ink-50 transition-colors" href={localizedUrl('patrocinar', lang)}>{t('nav.patrocinar')}</a></li>
       </ul>
