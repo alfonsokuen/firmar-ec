@@ -57,6 +57,13 @@ export interface CertCheckResult {
   givenName?: string;
   /** Surnames — from the ACE arc, falling back to the DN (OID 2.5.4.4). */
   surname?: string;
+  /**
+   * Company the holder represents, as published by the ACE. Present only on
+   * legal-representative certificates — for those, `ruc` is the company's.
+   */
+  organization?: string;
+  /** Role the holder signs under (REPRESENTANTE LEGAL, GERENTE GENERAL, …). */
+  jobTitle?: string;
   serialHex: string;
   notBefore: string; // ISO string
   notAfter: string; // ISO string
@@ -311,6 +318,8 @@ export async function checkCertificate(
   if (identity.ruc !== undefined) result.ruc = identity.ruc;
   if (identity.givenName !== undefined) result.givenName = identity.givenName;
   if (identity.surname !== undefined) result.surname = identity.surname;
+  if (identity.organization !== undefined) result.organization = identity.organization;
+  if (identity.jobTitle !== undefined) result.jobTitle = identity.jobTitle;
   if (path.matchedRoot?.slug !== undefined) result.matchedAceSlug = path.matchedRoot.slug;
   if (path.matchedRoot?.orgName !== undefined) result.matchedAceOrg = path.matchedRoot.orgName;
   if (revocation.via !== undefined) result.revocationVia = revocation.via;

@@ -39,6 +39,10 @@ const SUFFIX_CEDULA = '1';
 const SUFFIX_GIVEN_NAME = '2';
 const SUFFIX_SURNAME_1 = '3';
 const SUFFIX_SURNAME_2 = '4';
+/** Role the holder signs under — only issued on legal-representative certs. */
+const SUFFIX_JOB_TITLE = '5';
+/** Company the holder represents. Absent on natural-person certificates. */
+const SUFFIX_ORGANIZATION = '10';
 const SUFFIX_RUC = '11';
 
 const SUBJECT_ALT_NAME_OID = '2.5.29.17';
@@ -77,6 +81,13 @@ export interface EcCertIdentity {
   givenName?: string | undefined;
   /** Surnames, joined when the ACE splits them into two attributes. */
   surname?: string | undefined;
+  /**
+   * Legal name of the company the holder represents, as published by the ACE.
+   * Present only on legal-representative / corporate-membership certificates.
+   */
+  organization?: string | undefined;
+  /** Role the holder signs under, e.g. REPRESENTANTE LEGAL, GERENTE GENERAL. */
+  jobTitle?: string | undefined;
   /** Which ACE arc matched, for diagnostics. `undefined` when none did. */
   ace?: string | undefined;
   /** Where the cédula was found. Useful to explain an empty result. */
@@ -197,6 +208,8 @@ export function ecCertIdentity(cert: Certificate): EcCertIdentity {
 
     identity.ruc = nonEmpty(values.get(`${arc}.${SUFFIX_RUC}`));
     identity.givenName = nonEmpty(values.get(`${arc}.${SUFFIX_GIVEN_NAME}`));
+    identity.organization = nonEmpty(values.get(`${arc}.${SUFFIX_ORGANIZATION}`));
+    identity.jobTitle = nonEmpty(values.get(`${arc}.${SUFFIX_JOB_TITLE}`));
 
     const surnames = [
       nonEmpty(values.get(`${arc}.${SUFFIX_SURNAME_1}`)),
@@ -248,6 +261,11 @@ export function ecCertIdentity(cert: Certificate): EcCertIdentity {
     const bare = orgId ? stripIdPrefix(String(orgId.value.valueBlock.value)) : undefined;
     if (bare !== undefined && new RegExp(`^\\d{${RUC_DIGITS}}$`).test(bare)) identity.ruc = bare;
   }
+
+  // No DN fallback for `organization`: the subject `O` RDN does not mean the
+  // same thing across ACEs. ArgosData puts the represented company there, but
+  // Security Data and the BCE put their OWN name ("SECURITY DATA S.A. 2"), so
+  // falling back would attribute the issuer's identity to the holder.
 
   // The DN still wins for names when the ACE arc published none.
   identity.givenName ??= nonEmpty(subject.raw['GN']);

@@ -5,6 +5,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Added
+- **La ficha de «Validar certificado» ya distingue a un representante legal** (`@firma-ec/pwa` 0.26.0).
+  Un certificado de representante legal identifica a DOS partes —la persona que tiene la llave y la
+  empresa por la que firma— y la ficha solo mostraba a la persona: quien recibía un documento no
+  podía saber si la firma obligaba a una empresa. Ahora salen **RUC**, **Razón social** y **Cargo**,
+  los mismos tres campos que muestra FirmaEC 5.1.0. Las ACE publican el par bajo su propio arco OID
+  con sufijos comunes (verificado contra certificados reales de ArgosData y Security Data): `.5`
+  cargo, `.10` razón social, `.11` el RUC de la **empresa** (no el del titular). `organization` no
+  cae al RDN `O` del subject a propósito: ArgosData pone ahí la empresa representada, pero Security
+  Data y el BCE ponen su PROPIO nombre, y el fallback atribuiría la identidad del emisor al titular.
+  La etiqueta «Cédula / RUC» pasa a «Cédula» porque el RUC ya tiene fila propia. Verificado con un
+  .p12 real de representante legal sobre el build de producción: los tres valores coinciden con los
+  que FirmaEC 5.1.0 muestra para el mismo archivo.
+
 ### Changed
 - **La app puede embeberse desde 3tap** (`infra/docker/Caddyfile.pwa`): `frame-ancestors 'none'` pasa a `'self' https://app.3tap.ec` y se retira `X-Frame-Options: DENY` (no admite lista y pisaría la CSP). 3tap.ec la muestra en su pestaña «Firmar documentos» con las mismas pantallas (previsualizar, firmar, verificar). Ningún otro origen puede embeberla.
 

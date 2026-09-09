@@ -287,6 +287,24 @@ function revocationLabel(s: CertCheckResult['revocationStatus']): string {
             <dd class="text-ink-800 dark:text-ink-100 font-mono break-all">{result.cedula}</dd>
           {/if}
 
+          <!-- Legal-representative block. On those certificates the RUC is the
+               company's, not the holder's, so it only reads correctly next to
+               the razón social and the cargo — same trio FirmaEC 5.1.0 shows. -->
+          {#if result.ruc}
+            <dt class="text-ink-500">{t('validar_cert.field_ruc')}</dt>
+            <dd class="text-ink-800 dark:text-ink-100 font-mono break-all">{result.ruc}</dd>
+          {/if}
+
+          {#if result.organization}
+            <dt class="text-ink-500">{t('validar_cert.field_razon_social')}</dt>
+            <dd class="text-ink-800 dark:text-ink-100 break-words">{result.organization}</dd>
+          {/if}
+
+          {#if result.jobTitle}
+            <dt class="text-ink-500">{t('validar_cert.field_cargo')}</dt>
+            <dd class="text-ink-800 dark:text-ink-100 break-words">{result.jobTitle}</dd>
+          {/if}
+
           <dt class="text-ink-500">{t('validar_cert.field_emisor')}</dt>
           <dd class="text-ink-800 dark:text-ink-100 break-words">
             {result.matchedAceOrg ?? result.issuerCN ?? '—'}
