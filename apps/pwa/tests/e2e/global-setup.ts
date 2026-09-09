@@ -21,12 +21,14 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import forge from 'node-forge';
+import { E2E_REP_LEGAL_ATTRS, E2E_REP_LEGAL_CN } from './helpers/rep-legal-fixture';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, 'fixtures', 'generated');
 const OUT_FILE = join(OUT_DIR, 'test-signer.p12');
 const AIA_P12_FILE = join(OUT_DIR, 'test-signer-aia-bundle-miss.p12');
 const AIA_INTERMEDIATE_PEM_FILE = join(OUT_DIR, 'test-aia-intermediate.pem');
+const REP_LEGAL_P12_FILE = join(OUT_DIR, 'test-representante-legal.p12');
 
 /**
  * PIN for the generated fixture. Intentionally a fixed, non-secret literal —
@@ -195,6 +197,71 @@ function generateAiaTestChain(): { p12: Buffer; intermediatePem: string } {
   };
 }
 
+/**
+ * ACE arc of ArgosData. Every accredited CA publishes the holder's identity
+ * under its own private arc reusing the same suffixes — `.5` cargo, `.10`
+ * razón social, `.11` the RUC of the company. See packages/crypto-core/src/ec-identity.ts.
+ */
+const ACE_ARC = '1.3.6.1.4.1.59198.3';
+
+/** DER of a UTF8String — the encoding every ACE uses for these attributes. */
+function derUtf8(value: string): string {
+  return forge.asn1
+    .toDer(forge.asn1.create(forge.asn1.Class.UNIVERSAL, forge.asn1.Type.UTF8, false, value))
+    .getBytes();
+}
+
+/**
+ * Legal-representative .p12 for the "Validar certificado" e2e.
+ *
+ * Synthetic on purpose: a REAL legal-representative certificate carries the
+ * cédula of a person and the RUC of a live company, and no such file may enter
+ * this repository — not even to prove the feature works. The identity below is
+ * invented (cédula 1700000001 passes the mod-10 check but belongs to nobody).
+ *
+ * Self-signed, so the page reports it as not accredited — irrelevant here: the
+ * assertion is that the three fields get RENDERED, which is exactly what was
+ * missing before and what a unit test on the parser cannot prove.
+ */
+function generateRepresentanteLegalP12(): Buffer {
+  const keys = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 });
+  const cert = forge.pki.createCertificate();
+  cert.publicKey = keys.publicKey;
+  cert.serialNumber = `01${Math.floor(Math.random() * 1e9)
+    .toString(16)
+    .padStart(8, '0')}`;
+  const now = new Date();
+  cert.validity.notBefore = new Date(now.getTime() - 60_000);
+  cert.validity.notAfter = new Date(now.getTime() + 365 * 24 * 3600 * 1000);
+
+  const attrs = [
+    { name: 'commonName', value: E2E_REP_LEGAL_CN },
+    { name: 'countryName', value: 'EC' },
+  ];
+  cert.setSubject(attrs);
+  cert.setIssuer(attrs);
+  cert.setExtensions([
+    { name: 'basicConstraints', cA: false },
+    { name: 'keyUsage', digitalSignature: true, nonRepudiation: true },
+    ...Object.entries(E2E_REP_LEGAL_ATTRS).map(
+      (entry) =>
+        ({
+          id: `${ACE_ARC}.${entry[0]}`,
+          critical: false,
+          value: derUtf8(entry[1]),
+        }) as unknown as forge.pki.CertificateExtension,
+    ),
+  ]);
+  cert.sign(keys.privateKey, forge.md.sha256.create());
+
+  const p12Asn1 = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [cert], E2E_TEST_P12_PIN, {
+    algorithm: 'aes256',
+    useMac: true,
+    count: 2048,
+  });
+  return Buffer.from(forge.asn1.toDer(p12Asn1).getBytes(), 'binary');
+}
+
 export default function globalSetup(): void {
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
   const p12 = generateSelfSignedP12();
@@ -204,6 +271,9 @@ export default function globalSetup(): void {
   writeFileSync(AIA_P12_FILE, aiaChain.p12);
   writeFileSync(AIA_INTERMEDIATE_PEM_FILE, aiaChain.intermediatePem);
 
+  const repLegal = generateRepresentanteLegalP12();
+  writeFileSync(REP_LEGAL_P12_FILE, repLegal);
+
   // globalSetup runs in plain Node before the test runner reporter attaches;
   // console.log is the only visibility into fixture generation (mirrors the
   // convention in packages/signer/scripts/gen-test-p12.ts).
@@ -212,5 +282,9 @@ export default function globalSetup(): void {
   // biome-ignore lint/suspicious/noConsole: intentional — see comment above.
   console.log(
     `[global-setup] generated F1 AIA leaf-only .p12 → ${AIA_P12_FILE} (${aiaChain.p12.length} bytes)`,
+  );
+  // biome-ignore lint/suspicious/noConsole: intentional — see comment above.
+  console.log(
+    `[global-setup] generated legal-representative .p12 → ${REP_LEGAL_P12_FILE} (${repLegal.length} bytes)`,
   );
 }
