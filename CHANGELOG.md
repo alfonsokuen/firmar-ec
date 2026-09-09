@@ -5,6 +5,22 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Fixed
+- **Un 404 bajo `/assets/` se cacheaba un AÑO, y tumbó la app durante 7 minutos** (`@firma-ec/pwa` 0.26.1,
+  `infra/docker/Caddyfile.pwa`). La política de caché se aplica por **ruta** (`@hashed path_regexp
+  ^/assets/…`), y Caddy la evalúa antes de saber si el fichero existe: un 404 salía con el mismo
+  `max-age=31536000, immutable` que un chunk real, y `handle_errors` no tocaba la cabecera. Durante un
+  rolling update `start-first` conviven la réplica vieja y la nueva unos segundos, así que una petición
+  al chunk NUEVO puede caer en la VIEJA y recibir 404 — que quedaba cacheado un año en Cloudflare y en
+  el navegador, el cual con `immutable` **ni siquiera revalida**. Pasó de verdad al desplegar la 0.26.0:
+  el entry `index-*.js` quedó envenenado en el edge (`cf-cache-status: HIT`) y cualquier visitante sin
+  Service Worker recibía una página en blanco. Resuelto en el momento purgando la zona, y aquí a la
+  raíz: `handle_errors` fuerza `Cache-Control: no-store`, que es el único punto por el que pasan todas
+  las respuestas de error. El smoke post-deploy afirma ahora que un 404 de `/assets/` NO es cacheable,
+  sobre la respuesta real de producción. Verificado en rojo antes del fix: `/assets/no-existe-….js`
+  respondía `public, max-age=31536000, immutable`. El bump de versión cambia el hash del entry, así que
+  los navegadores que guardaron el 404 piden un nombre nuevo y se recuperan solos.
+
 ### Added
 - **La ficha de «Validar certificado» ya distingue a un representante legal** (`@firma-ec/pwa` 0.26.0).
   Un certificado de representante legal identifica a DOS partes —la persona que tiene la llave y la

@@ -299,6 +299,17 @@
   }
 
   handle_errors {
+    # La politica de cache de arriba se aplica por RUTA, y Caddy la evalua antes
+    # de saber si el fichero existe: un 404 bajo /assets/ salia con el mismo
+    # `max-age=31536000, immutable` que un chunk real. Durante un rolling update
+    # start-first conviven la replica vieja y la nueva unos segundos, asi que una
+    # peticion al chunk NUEVO puede caer en la VIEJA y recibir 404 — y ese 404 se
+    # quedaba cacheado un ANO en Cloudflare y en el navegador (que con
+    # `immutable` ni siquiera revalida). El cliente veia la app en blanco hasta
+    # que expirase. Ocurrio de verdad en el deploy de la 0.26.0 (2026-09-09).
+    # Un error nunca es cacheable: se sobrescribe la cabecera aqui, que es el
+    # unico punto por el que pasan TODAS las respuestas de error.
+    header Cache-Control "no-store"
     respond "{err.status_code}" {err.status_code}
   }
 }
