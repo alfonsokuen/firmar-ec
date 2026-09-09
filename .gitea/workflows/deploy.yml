@@ -391,7 +391,7 @@ jobs:
               # en el navegador, y el cliente veia la app en blanco (paso de
               # verdad en el deploy de la 0.26.0). Se afirma aqui porque es el
               # unico punto que ve la respuesta REAL de produccion.
-              CC404=$(curl -k --resolve "${HOST}:443:${ORIGIN_IP}" --compressed -sS -D- -o /dev/null "https://${HOST}/assets/__no-existe-$$-abcdef12.js" 2>/dev/null | tr -d '' | awk 'tolower($1)=="cache-control:"{$1=""; print tolower($0)}')
+              CC404=$(curl -k --resolve "${HOST}:443:${ORIGIN_IP}" --compressed -sS -D- -o /dev/null "https://${HOST}/assets/__no-existe-$$-abcdef12.js" 2>/dev/null | tr -d '\015' | awk 'tolower($1)=="cache-control:"{$1=""; print tolower($0)}')
               case "$CC404" in
                 *immutable*|*max-age=3153*) echo "  404 de /assets cacheable ('$CC404') — envenenaria el edge" >&2; CC_OK=0 ;;
                 *) echo "  404 de /assets no cacheable ($CC404)"; CC_OK=1 ;;
