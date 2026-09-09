@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 // Tests de los DETECTORES post-build. Existen porque un detector sin test se
 // degrada en silencio: `check-llms` y `check-answer-pages` corren sobre `dist`
 // y, si se debilitan, el build sigue VERDE por construcción — una exención más
@@ -9,12 +12,13 @@
 // cualquier cambio de detector): cada caso que debe cazarse tiene su pareja que
 // NO debe disparar. Un test que solo afirma la dirección positiva se queda
 // verde cuando alguien convierte el guarda en un no-op.
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import {
+  checkAnswerHtml,
+  decodeText,
+  parseAnswerFrontmatter,
+} from '../scripts/check-answer-pages.mjs';
 import { isExempt } from '../scripts/check-llms.mjs';
-import { checkAnswerHtml, parseAnswerFrontmatter, decodeText } from '../scripts/check-answer-pages.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -80,7 +84,7 @@ describe('check-answer-pages — parseAnswerFrontmatter', () => {
 
   it('RECHAZA la faq en JSON de una línea — el fallo del primer forjado real', () => {
     const enLinea = FM_CANONICO.replace(
-      /faq:\n(  - q.*\n    a.*\n)+/,
+      /faq:\n( {2}- q.*\n {4}a.*\n)+/,
       'faq: [{"q":"P1","a":"R1"}]\n',
     );
     expect(parseAnswerFrontmatter(enLinea)).toBeNull();

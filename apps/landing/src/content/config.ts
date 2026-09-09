@@ -89,9 +89,7 @@ const respuestas = defineCollection({
        *  que ya no existe se DESCARTA al renderizar, no rompe el build: si
        *  rompiera, borrar una respuesta —que es exactamente la reversión del
        *  bot— tumbaría el sitio entero y dejaría la marcha atrás bloqueada. */
-      relatedSlugs: z
-        .array(z.string().regex(/^\/[a-z0-9/-]+\/$/))
-        .default([]),
+      relatedSlugs: z.array(z.string().regex(/^\/[a-z0-9/-]+\/$/)).default([]),
       /** Ids de claim del brand brief que anclan las frases factuales, para
        *  poder auditar después la procedencia de cada afirmación. */
       evidenceClaims: z.array(z.string()).default([]),
