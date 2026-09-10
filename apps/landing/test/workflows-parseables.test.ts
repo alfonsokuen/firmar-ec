@@ -66,12 +66,17 @@ describe('workflows — bytes que rompen el parser en silencio', () => {
       expect(lineas.map((x) => x.n)).toEqual([]);
     });
 
-    it(`${name} no lleva tabuladores (YAML los prohibe para indentar)`, () => {
+    it(`${name} no usa tabuladores para INDENTAR`, () => {
       const raw = readFileSync(path, 'utf8');
+      // Acotado a la indentacion a proposito: YAML prohibe el tabulador como
+      // caracter de sangrado, no dentro de un escalar. Un tab literal en un
+      // bloque `run: |` (separador de campos de un awk, alineacion en un
+      // heredoc) es valido, y afirmarlo entero pondria el CI en rojo sin que
+      // hubiera nada roto.
       const lineas = raw
         .split('\n')
         .map((l, i) => ({ n: i + 1, l }))
-        .filter((x) => x.l.includes(TAB));
+        .filter((x) => new RegExp(`^[ ]*${TAB}`).test(x.l));
       expect(lineas.map((x) => x.n)).toEqual([]);
     });
   }

@@ -119,6 +119,20 @@ const cardIcon = $derived.by((): string => {
   return 'i-lucide-shield-alert text-warn-500';
 });
 
+/**
+ * A quien pertenece el RUC. El de una persona natural es su cedula mas el
+ * codigo de establecimiento, asi que EMPIEZA por la cedula; el de una empresa
+ * no. La fila se pintaba con la etiqueta «RUC» a secas aunque faltara la razon
+ * social —pasa cuando la ACE no esta en ACE_ARCS y el RUC sale del
+ * organizationIdentifier del DN—, y ahi el numero de una empresa se leia como
+ * un dato del titular: justo el error que esta pantalla existe para evitar.
+ */
+const rucLabel = $derived.by((): string => {
+  if (!result?.ruc) return t('validar_cert.field_ruc');
+  const esDelTitular = result.cedula !== undefined && result.ruc.startsWith(result.cedula);
+  return esDelTitular ? t('validar_cert.field_ruc') : t('validar_cert.field_ruc_empresa');
+});
+
 function statusLabel(s: CertCheckResult['validityStatus']): string {
   if (s === 'expired') return t('validar_cert.status_expired');
   if (s === 'not_yet_valid') return t('validar_cert.status_not_yet');
@@ -287,11 +301,12 @@ function revocationLabel(s: CertCheckResult['revocationStatus']): string {
             <dd class="text-ink-800 dark:text-ink-100 font-mono break-all">{result.cedula}</dd>
           {/if}
 
-          <!-- Legal-representative block. On those certificates the RUC is the
-               company's, not the holder's, so it only reads correctly next to
-               the razón social and the cargo — same trio FirmaEC 5.1.0 shows. -->
+          <!-- Legal-representative block: RUC + razón social + cargo, el mismo
+               trio que muestra FirmaEC 5.1.0. La etiqueta del RUC dice de quien
+               es (ver `rucLabel`), porque la razón social puede faltar y el
+               número solo se lee bien sabiendo a quién pertenece. -->
           {#if result.ruc}
-            <dt class="text-ink-500">{t('validar_cert.field_ruc')}</dt>
+            <dt class="text-ink-500">{rucLabel}</dt>
             <dd class="text-ink-800 dark:text-ink-100 font-mono break-all">{result.ruc}</dd>
           {/if}
 

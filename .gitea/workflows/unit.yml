@@ -73,6 +73,18 @@ name: unit
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  # Tambien en push directo a main: el gate de PR no cubre el flujo real de este
+  # repo. Los 8 ultimos commits de main entraron por push directo (`git log
+  # --first-parent`), asi que la guarda de workflows —anadida el 2026-09-09 tras
+  # un CR que dejo deploy.yml invalido— no llego a ejecutarse ni una vez por el
+  # camino por el que entro el bug que le dio origen.
+  #
+  # Limite conocido, escrito para que nadie se confie: si el fichero roto es el
+  # que lleva ESTE job, Gitea tambien lo ignora en silencio y no corre nada. Ese
+  # caso no lo puede cubrir el propio CI; la senal es el log de Gitea
+  # (`ignore invalid workflow`), y esta anotado en la memoria del harness.
+  push:
+    branches: [main]
 
 concurrency:
   group: unit-${{ github.event.pull_request.number }}

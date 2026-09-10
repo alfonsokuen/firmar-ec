@@ -44,7 +44,8 @@ const LABELS = {
     submit: /^Validar certificado$/,
     titular: 'Titular',
     cedula: 'Cédula',
-    ruc: 'RUC',
+    ruc: 'RUC de la empresa',
+    rucPropio: 'RUC',
     razonSocial: 'Razón social',
     cargo: 'Cargo',
   },
@@ -53,7 +54,8 @@ const LABELS = {
     submit: /^Validate certificate$/,
     titular: 'Holder',
     cedula: 'National ID',
-    ruc: 'Tax ID \\(RUC\\)',
+    ruc: 'Company tax ID (RUC)',
+    rucPropio: 'Tax ID (RUC)',
     razonSocial: 'Company',
     cargo: 'Role',
   },
@@ -78,9 +80,16 @@ async function validarCert(
   await expect(fila(page, labels.titular)).toBeVisible({ timeout: 30_000 });
 }
 
-/** El `<dt>` cuya etiqueta es exactamente `label`. */
+/**
+ * El `<dt>` cuya etiqueta es exactamente `label`.
+ *
+ * `:text-is()` compara el texto completo, sin regex: escribir `\(` a mano en un
+ * literal ya convirtio una vez el parentesis en un grupo de captura, y la
+ * comparacion dejaba de casar sin que el test dijera nada util. `JSON.stringify`
+ * pone las comillas y escapa lo que haga falta.
+ */
 function fila(page: Page, label: string) {
-  return page.locator('dt').filter({ hasText: new RegExp(`^${label}$`) });
+  return page.locator(`dt:text-is(${JSON.stringify(label)})`);
 }
 
 /** El valor (`<dd>`) de esa fila. */
@@ -103,7 +112,12 @@ for (const [lang, labels] of Object.entries(LABELS)) {
       await expect(valorDe(page, labels.ruc)).toHaveText(E2E_REP_LEGAL_ATTRS['11']!);
       await expect(valorDe(page, labels.razonSocial)).toHaveText(E2E_REP_LEGAL_ATTRS['10']!);
       await expect(valorDe(page, labels.cargo)).toHaveText(E2E_REP_LEGAL_ATTRS['5']!);
+
+      // El RUC es de la EMPRESA: no empieza por la cedula del titular, y la
+      // ficha debe DECIRLO. Sin esa etiqueta, el numero de una empresa se lee
+      // como un dato de la persona — el error que esta pantalla evita.
       expect(E2E_REP_LEGAL_ATTRS['11']!.startsWith(E2E_REP_LEGAL_ATTRS['1']!)).toBe(false);
+      await expect(fila(page, labels.rucPropio)).toHaveCount(0);
     });
 
     test('un certificado sin empresa no deja filas vacías', async ({ page }) => {

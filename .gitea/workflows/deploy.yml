@@ -383,21 +383,8 @@ jobs:
                && check_type "manifest.webmanifest" "json" \
                && check_type "pdfjs/pdf.worker.min.mjs" "javascript"; then
               NEG=$(curl -k --resolve "${HOST}:443:${ORIGIN_IP}" --compressed -sS -o /dev/null -w '%{content_type}' "https://${HOST}/pdfjs/__no-existe-$$.mjs" 2>/dev/null || echo '-')
-              # Un 404 bajo /assets/ NO puede ser cacheable. La politica de cache
-              # se aplica por RUTA, antes de saber si el fichero existe, asi que
-              # el `immutable, max-age=1 ano` de los chunks tambien acompanaba al
-              # 404. Durante el rolling update una peticion al chunk nuevo cae a
-              # veces en la replica vieja: ese 404 se cacheaba un ANO en el edge y
-              # en el navegador, y el cliente veia la app en blanco (paso de
-              # verdad en el deploy de la 0.26.0). Se afirma aqui porque es el
-              # unico punto que ve la respuesta REAL de produccion.
-              CC404=$(curl -k --resolve "${HOST}:443:${ORIGIN_IP}" --compressed -sS -D- -o /dev/null "https://${HOST}/assets/__no-existe-$$-abcdef12.js" 2>/dev/null | tr -d '\015' | awk 'tolower($1)=="cache-control:"{$1=""; print tolower($0)}')
-              case "$CC404" in
-                *immutable*|*max-age=3153*) echo "  404 de /assets cacheable ('$CC404') — envenenaria el edge" >&2; CC_OK=0 ;;
-                *) echo "  404 de /assets no cacheable ($CC404)"; CC_OK=1 ;;
-              esac
               case "$NEG" in
-                *html*) [ "${CC_OK:-0}" = "1" ] && { echo "Smoke post-deploy pwa OK [intento $attempt]"; SMOKE_OK=1; break; } ;;
+                *html*) echo "Smoke post-deploy pwa OK [intento $attempt]"; SMOKE_OK=1; break ;;
                 *) echo "control negativo devolvio '$NEG', no HTML — premisa rota" >&2 ;;
               esac
             fi
@@ -412,6 +399,33 @@ jobs:
               || echo "ATENCION: rollback devolvio error — revisar a mano" >&2
             exit 1
           fi
+
+          # --- Un 404 bajo /assets/ NO puede ser cacheable -------------------
+          # La politica de cache se aplica por RUTA y Caddy la evalua ANTES de
+          # saber si el fichero existe, asi que el `immutable, max-age=1 ano` de
+          # los chunks acompanaba tambien al 404. En un rolling update
+          # start-first la peticion al chunk NUEVO cae a veces en la replica
+          # VIEJA: ese 404 se cacheo un ANO en el edge y dejo la app en blanco
+          # (deploy de la 0.26.0, 2026-09-09).
+          #
+          # Va FUERA del bucle y NO dispara rollback, a proposito:
+          #  - es una propiedad de la config horneada en la imagen, no un estado
+          #    que converja: reintentarla 15 veces no la cambia;
+          #  - revertir seria otro rolling update start-first, es decir volver a
+          #    generar los 404 que envenenan: la cura reproduciendo el dano.
+          # Se afirma en POSITIVO (exigir no-store) y el cajon de sastre es
+          # ROJO: un curl fallido deja la variable vacia, y "no pude medirlo"
+          # jamas puede leerse como "esta bien".
+          CC404=$(curl -k --resolve "${HOST}:443:${ORIGIN_IP}" --compressed -sS --max-time 15 -D- -o /dev/null "https://${HOST}/assets/__no-existe-$$-abcdef12.js" 2>/dev/null | tr -d '\015' | awk 'tolower($1)=="cache-control:"{$1=""; print tolower($0)}' || echo 'CURL-FAIL')
+          [ -n "$CC404" ] || CC404='SIN-CABECERA-O-NO-MEDIDO'
+          case "$CC404" in
+            *no-store*|*no-cache*)
+              echo "  404 de /assets no cacheable ($CC404)" ;;
+            *)
+              echo "  404 de /assets: Cache-Control='$CC404' - cacheable o NO medido." >&2
+              echo "  El servicio queda desplegado y sirviendo; NO se revierte (ver comentario)." >&2
+              exit 1 ;;
+          esac
 
       # --- 8. Commit status en Gitea ---------------------------------------------
       - name: Reportar commit status (success)

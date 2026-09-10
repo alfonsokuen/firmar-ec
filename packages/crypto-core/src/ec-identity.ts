@@ -39,10 +39,25 @@ const SUFFIX_CEDULA = '1';
 const SUFFIX_GIVEN_NAME = '2';
 const SUFFIX_SURNAME_1 = '3';
 const SUFFIX_SURNAME_2 = '4';
-/** Role the holder signs under — only issued on legal-representative certs. */
+/**
+ * Role the holder signs under — only issued on legal-representative certs.
+ *
+ * Confirmed against REAL certificates of Security Data (in the repo's fixtures),
+ * ArgosData and Uanataca (verified out of band: a legal-representative .p12
+ * carries a person's cédula and a live company's RUC, so neither may enter this
+ * repository). For the remaining arcs it is the shared scheme by convention,
+ * with no sample to confirm it.
+ */
 const SUFFIX_JOB_TITLE = '5';
 /** Company the holder represents. Absent on natural-person certificates. */
 const SUFFIX_ORGANIZATION = '10';
+/**
+ * Tax ID. Whose it is depends on `.10`: on a legal-representative certificate
+ * it is the COMPANY's, but on a natural-person one it is the holder's own
+ * (their cédula plus an establishment code, so it starts with the cédula).
+ * Every natural-person fixture in this repo — ArgosData, BCE, Uanataca —
+ * publishes the holder's. Do not describe it as "the company's" on its own.
+ */
 const SUFFIX_RUC = '11';
 
 const SUBJECT_ALT_NAME_OID = '2.5.29.17';

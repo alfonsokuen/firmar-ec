@@ -6,6 +6,45 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 ## [Unreleased]
 
 ### Fixed
+- **Las guardas del incidente anterior eran, ellas mismas, mudas** (`@firma-ec/pwa` 0.26.2). Una revisión
+  con dos agentes independientes sobre el diff completo encontró que lo arreglado el 09-sep estaba bien,
+  pero que **las protecciones añadidas para que no volviera a pasar no podían ver el fallo**. Corregido:
+  - *El smoke del 404 se ponía VERDE sin medir nada.* `CC404` se capturaba de una tubería sin respaldo:
+    si `curl` fallaba, la variable quedaba vacía, caía en el cajón de sastre permisivo y el deploy pasaba
+    imprimiendo `404 de /assets no cacheable ()`. Además afirmaba en negativo (solo fallaba ante
+    `immutable`), así que un 404 con `max-age=604800` o sin cabecera pasaba. Ahora exige `no-store` en
+    **positivo**, con `--max-time`, `|| echo CURL-FAIL` y el vacío tratado como ROJO. Probado contra seis
+    escenarios: antes 3 de 5 daban falso verde, ahora solo el verde real es verde.
+  - *Esa comprobación disparaba `docker service rollback`.* Es una propiedad de la config horneada en la
+    imagen, no un estado que converja: reintentarla 15 veces no la cambia, y revertir es otro rolling
+    update `start-first` — es decir, volver a generar los 404 que envenenan el edge. Ahora se evalúa una
+    sola vez, fuera del bucle, y falla sin revertir.
+  - *`handle_errors` no cubría «TODAS las respuestas de error», como afirmaba el comentario.* Un
+    `respond <matcher> 4xx` escribe la respuesta y no pasa por ahí. Verificado sobre la imagen real: en
+    la instancia handoff, el 404 de `/manifest.webmanifest` salía con `public, max-age=3600` — un error
+    cacheado una hora. Los tres `respond` pasan a `error`, que sí se encauza; comprobadas las cuatro
+    rutas (404 de assets y de `respond` → `no-store`; asset real → `immutable`).
+  - *La guarda de workflows no corría por donde entró el bug*: `unit.yml` solo disparaba en
+    `pull_request` y los últimos ocho commits de `main` fueron push directo. Añadido `push: [main]`, con
+    el límite conocido escrito al lado: si el fichero roto es el que lleva el job, Gitea también lo
+    ignora en silencio y eso no lo puede cubrir el propio CI.
+  - *Falso rojo por tabuladores*: YAML los prohíbe para **indentar**, no dentro de un escalar; un tab en
+    un `awk` era válido y habría parado el CI sin nada roto. La afirmación se acota al sangrado.
+  - *La fila «RUC» se pintaba desacoplada de la razón social.* Cuando la ACE no está mapeada, el RUC sale
+    del `organizationIdentifier` del DN sin razón social que lo acompañe, y el número de una empresa se
+    leía como dato de la persona — el error exacto que esta pantalla existe para evitar. Ahora la
+    etiqueta dice de quién es: «RUC de la empresa» salvo que empiece por la cédula del titular.
+  - *El test que decía probar el cableado de `certCheck` solo afirmaba la dirección que ya era cierta*
+    (un certificado de persona natural, donde ambos campos son `undefined`). Se le pasa ahora un
+    certificado de representante legal firmado de verdad; visto en rojo quitando las dos asignaciones.
+  - *El corpus real podía perderse a la mitad en silencio*: `leavesFrom` descarta blobs que no parsean y
+    el test sumaba dos fixtures, así que uno podía desaparecer sin poner nada en rojo. Se afirma por
+    fichero.
+  - *Procedencia corregida en cuatro sitios.* Se afirmaba `.11` = «el RUC de la empresa (no el del
+    titular)»: falso en general — en ArgosData de persona natural, BCE y Uanataca es el del titular. Solo
+    lo es cuando existe `.10`. Y de las cinco ACE, la única con `.5`/`.10` **en el repositorio** es
+    Security Data; ArgosData y Uanataca se verificaron fuera de banda con .p12 reales que no pueden
+    commitearse.
 - **Un 404 bajo `/assets/` se cacheaba un AÑO, y tumbó la app durante 7 minutos** (`@firma-ec/pwa` 0.26.1,
   `infra/docker/Caddyfile.pwa`). La política de caché se aplica por **ruta** (`@hashed path_regexp
   ^/assets/…`), y Caddy la evalúa antes de saber si el fichero existe: un 404 salía con el mismo
@@ -27,8 +66,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
   empresa por la que firma— y la ficha solo mostraba a la persona: quien recibía un documento no
   podía saber si la firma obligaba a una empresa. Ahora salen **RUC**, **Razón social** y **Cargo**,
   los mismos tres campos que muestra FirmaEC 5.1.0. Las ACE publican el par bajo su propio arco OID
-  con sufijos comunes (verificado contra certificados reales de ArgosData y Security Data): `.5`
-  cargo, `.10` razón social, `.11` el RUC de la **empresa** (no el del titular). `organization` no
+  con sufijos comunes: `.5` cargo, `.10` razón social y `.11` el RUC — que es el de la **empresa
+  cuando existe `.10`**, y el del propio titular (cédula + código de establecimiento) en un
+  certificado de persona natural; por eso la ficha etiqueta la fila según a quién pertenece, en vez
+  de llamarla «RUC» a secas. Procedencia, para que nadie confíe más de lo probado: los únicos
+  certificados REALES del repositorio con `.5`/`.10` son de Security Data; ArgosData y Uanataca se
+  verificaron fuera de banda con .p12 de representante legal auténticos, que no pueden commitearse
+  porque llevan la cédula de una persona viva y el RUC de una empresa real. `organization` no
   cae al RDN `O` del subject a propósito: ArgosData pone ahí la empresa representada, pero Security
   Data y el BCE ponen su PROPIO nombre, y el fallback atribuiría la identidad del emisor al titular.
   La etiqueta «Cédula / RUC» pasa a «Cédula» porque el RUC ya tiene fila propia. Verificado con un

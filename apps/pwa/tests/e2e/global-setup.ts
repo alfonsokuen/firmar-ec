@@ -199,8 +199,9 @@ function generateAiaTestChain(): { p12: Buffer; intermediatePem: string } {
 
 /**
  * ACE arc of ArgosData. Every accredited CA publishes the holder's identity
- * under its own private arc reusing the same suffixes — `.5` cargo, `.10`
- * razón social, `.11` the RUC of the company. See packages/crypto-core/src/ec-identity.ts.
+ * under its own private arc reusing the same suffixes — `.5` cargo, `.10` razón
+ * social, `.11` the tax ID (the company's when `.10` is present; otherwise the
+ * holder's own). See packages/crypto-core/src/ec-identity.ts.
  */
 const ACE_ARC = '1.3.6.1.4.1.59198.3';
 

@@ -126,7 +126,10 @@
     # unset, so the matcher path defaults to a sentinel that never matches and
     # the manifest is served normally (install stays enabled on app.firmar.ec).
     @no_manifest path {$HANDOFF_NO_MANIFEST:/__manifest_enabled__}
-    respond @no_manifest 404
+    # `error` y no `respond`: solo `error` encauza hacia handle_errors, donde se
+    # marca no-store. Con `respond` esta 404 salia con el `max-age=3600` que
+    # casaba por ruta en @manifest — un error cacheado una hora en el edge.
+    error @no_manifest 404
 
     # F6 TSA proxy must come before any file_server that would 405 a POST.
     @tsapost {
@@ -148,7 +151,7 @@
       path /api/tsa
       not method POST
     }
-    respond @tsa_notpost 405
+    error @tsa_notpost 405
 
     # ──────────────────────────────────────────────────────────────────────────
     # F7.5 — /api/ocsp/* and /api/crl/* allowlisted reverse proxies
@@ -271,7 +274,7 @@
     # Reject non-allowlisted /api/ocsp/*, /api/crl/*, /api/aia/* paths
     # explicitly so they don't silently fall through to the SPA fallback.
     @ltv_unknown path_regexp ^/api/(ocsp|crl|aia)/.+
-    respond @ltv_unknown 404
+    error @ltv_unknown 404
 
     # ──────────────────────────────────────────────────────────────────────────
     # v0.7.30 — Hashed assets serve-or-404, NEVER SPA-fallback.
@@ -307,8 +310,11 @@
     # quedaba cacheado un ANO en Cloudflare y en el navegador (que con
     # `immutable` ni siquiera revalida). El cliente veia la app en blanco hasta
     # que expirase. Ocurrio de verdad en el deploy de la 0.26.0 (2026-09-09).
-    # Un error nunca es cacheable: se sobrescribe la cabecera aqui, que es el
-    # unico punto por el que pasan TODAS las respuestas de error.
+    # Un error nunca es cacheable. OJO con el alcance: handle_errors solo ve los
+    # errores que EMITE un handler (file_server, reverse_proxy) o un `error`
+    # explicito. Un `respond <matcher> 404` escribe la respuesta y NO pasa por
+    # aqui: conserva la cabecera que casara por ruta. Por eso los rechazos de
+    # arriba usan `error` y no `respond`.
     header Cache-Control "no-store"
     respond "{err.status_code}" {err.status_code}
   }
