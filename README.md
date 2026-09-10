@@ -216,3 +216,9 @@ Usar la app web tal cual (firmar/verificar) es y seguirá siendo **gratis**, tam
 ## Créditos
 
 Desarrollado por [IDKmanager](https://idkmanager.com) (Ecuador).
+
+### Autor
+
+Creado por **[Alfonso Kuen Arroyo](https://idkmanager.com/equipo/alfonso-kuen-arroyo/)** — Founder & Technology Architect en IDK MANAGER.
+
+[Perfil](https://idkmanager.com/equipo/alfonso-kuen-arroyo/) · [GitHub](https://github.com/alfonsokuen) · [LinkedIn](https://www.linkedin.com/in/alfonso-kuen-arroyo-5a7a92133)
