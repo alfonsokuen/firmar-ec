@@ -41,6 +41,14 @@ function attachCapture(page: Page): { errors: string[]; logs: string[] } {
 
 test.describe('firmar.ec — /firmar-lote', () => {
   test('camino completo: 2 PDFs → revisión → firma real → ZIP', async ({ page }) => {
+    const events: string[] = [];
+    await page.route('**/api/stats/event?*', async (route) => {
+      const request = route.request();
+      expect(request.method()).toBe('POST');
+      expect(request.postData()).toBeNull();
+      events.push(new URL(request.url()).search);
+      await route.fulfill({ status: 204 });
+    });
     const cap = attachCapture(page);
     await page.goto('/#/firmar-lote');
 
@@ -72,6 +80,11 @@ test.describe('firmar.ec — /firmar-lote', () => {
     await p12Input.setInputFiles(FIXTURE_P12);
     const pinInput = page.locator('input[type="password"]').first();
     await pinInput.waitFor({ state: 'visible', timeout: 10_000 });
+    // Un intento fallido no cuenta; corregir el PIN permite contar el lote.
+    await pinInput.fill('wrong-pin');
+    await page.getByRole('button', { name: /firmar los 2|sign all 2/i }).click();
+    await expect(page.getByText(/contrase.*no es correcta|password is not correct/i)).toBeVisible();
+    expect(events).toEqual([]);
     await pinInput.fill(VALID_PIN);
     await page.getByRole('button', { name: /firmar los 2|sign all 2/i }).click();
 
@@ -85,6 +98,8 @@ test.describe('firmar.ec — /firmar-lote', () => {
       ),
     ).toHaveCount(0);
 
+    await expect.poll(() => events.filter((event) => event === '?type=lote').length).toBe(1);
+    expect(events).not.toContain('?type=sign');
     expect(cap.errors).toEqual([]);
   });
 

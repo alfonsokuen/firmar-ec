@@ -4,8 +4,8 @@
  * Postgres + Redis instead of KV.
  *
  * GET  /api/stats               → { pdfsSigned, signaturesVerified, certificatesValidated, certificatesIssued }
- * GET  /api/stats/series        → { granularity, since, buckets:[{period,sign,verify,cert,install}], totals }
- * POST /api/stats/event         → 204 (anonymous beacon; sign | verify | cert | install)
+ * GET  /api/stats/series        → { granularity, since, buckets:[{period,sign,verify,cert,install,lote}], totals }
+ * POST /api/stats/event         → 204 (anonymous beacon; sign | verify | cert | install | lote)
  *
  * The beacon is anonymous and best-effort: signing/verification are client-side
  * by design, so the server cannot attest them. We rate-limit per IP to resist
@@ -21,7 +21,7 @@ import { readSeries } from '../services/series-read.js';
 import { type Granularity, isGranularity } from '../services/series.js';
 import { type Totals, readTotals, recordEvent } from '../services/usage-stats.js';
 
-const EventBody = z.object({ type: z.enum(['sign', 'verify', 'cert', 'install']) });
+const EventBody = z.object({ type: z.enum(['sign', 'verify', 'cert', 'install', 'lote']) });
 
 const CACHE_TTL_MS = 60_000;
 
@@ -66,14 +66,26 @@ export default async function statsRoutes(
   let cache: { at: number; data: StatsResponse } | null = null;
 
   app.post('/api/stats/event', async (req, reply) => {
-    // 20 events/hour. Named per-IP, but `req.ip` resolves to an internal
-    // address behind the tunnel, so in production this is a SINGLE GLOBAL
-    // bucket shared by every visitor — see the drop warning below.
+    // Accept the type from a query param (so navigator.sendBeacon can fire a
+    // body-less, CORS-preflight-free POST) or a JSON body.
+    const fromQuery = (req.query as { type?: unknown } | undefined)?.type;
+    const fromBody = (req.body as { type?: unknown } | null)?.type;
+    const parsed = EventBody.safeParse({ type: fromQuery ?? fromBody });
+    if (!parsed.success) {
+      throw new StatsError(
+        'invalid_input',
+        "type must be 'sign', 'verify', 'cert', 'install' or 'lote'",
+      );
+    }
+
+    // 20 events/hour per type. Named per-IP, but `req.ip` resolves to an internal
+    // address behind the tunnel, so each type has a bucket shared by every
+    // visitor — see the drop warning below.
     // Fail OPEN and LOUD: if Redis is down the limiter is skipped (we'd rather
     // count an event than 500 the beacon or silently drop it).
     try {
       const rl = await checkAndConsume(app.redis.client, {
-        key: `rl:stats:${req.ip || 'unknown'}`,
+        key: `rl:stats:${req.ip || 'unknown'}:${parsed.data.type}`,
         capacity: 20,
         refillPerSec: 20 / 3_600,
       });
@@ -88,22 +100,13 @@ export default async function statsRoutes(
         // address, 0 public. This warning is the only trace that a real
         // operation went uncounted.
         app.log.warn(
-          { retryAfterS: rl.retryAfterS },
+          { retryAfterS: rl.retryAfterS, type: parsed.data.type },
           'stats event DROPPED by the shared rate-limit bucket — published counters now under-report',
         );
         return reply.code(204).send();
       }
     } catch (e) {
       app.log.warn({ err: e }, 'stats rate-limit unavailable, failing open');
-    }
-
-    // Accept the type from a query param (so navigator.sendBeacon can fire a
-    // body-less, CORS-preflight-free POST) or a JSON body.
-    const fromQuery = (req.query as { type?: unknown } | undefined)?.type;
-    const fromBody = (req.body as { type?: unknown } | null)?.type;
-    const parsed = EventBody.safeParse({ type: fromQuery ?? fromBody });
-    if (!parsed.success) {
-      throw new StatsError('invalid_input', "type must be 'sign', 'verify', 'cert' or 'install'");
     }
 
     await recordEvent(app.prisma, parsed.data.type);

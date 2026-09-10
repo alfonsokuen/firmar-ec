@@ -64,12 +64,19 @@ describe('readSeries — bucketing, zero-fill, since, totals', () => {
     expect(res.buckets).toHaveLength(30);
 
     const today = res.buckets.find((b) => b.period === '2026-06-22');
-    expect(today).toEqual({ period: '2026-06-22', sign: 2, verify: 1, cert: 0, install: 0 });
+    expect(today).toEqual({
+      period: '2026-06-22',
+      sign: 2,
+      verify: 1,
+      cert: 0,
+      install: 0,
+      lote: 0,
+    });
 
     // Every other bucket is zero-filled.
     const others = res.buckets.filter((b) => b.period !== '2026-06-22');
     for (const b of others) {
-      expect(b.sign + b.verify + b.cert + b.install).toBe(0);
+      expect(b.sign + b.verify + b.cert + b.install + b.lote).toBe(0);
     }
   });
 
@@ -92,10 +99,48 @@ describe('readSeries — bucketing, zero-fill, since, totals', () => {
       EC_NOON_JUN22,
     );
     const today = res.buckets.find((b) => b.period === '2026-06-22');
-    expect(today).toEqual({ period: '2026-06-22', sign: 1, verify: 0, cert: 0, install: 2 });
+    expect(today).toEqual({
+      period: '2026-06-22',
+      sign: 1,
+      verify: 0,
+      cert: 0,
+      install: 2,
+      lote: 0,
+    });
     // Y la clave existe SIEMPRE, tambien en los buckets vacios: un consumidor
     // que lea `b.install` no puede toparse con undefined.
     for (const b of res.buckets) expect(typeof b.install).toBe('number');
+  });
+
+  // 2026-09-10 — 'lote' es el quinto tipo de evento (medir el uso real de la
+  // firma por lotes). Mismo riesgo que 'install': que se cuente y luego se
+  // descarte en la proyeccion del bucket. Va sobre readSeries (la ruta real).
+  test('lote events reach the public bucket, and never suman a pdfsSigned', async () => {
+    const res = await readSeries(
+      mockPrisma({
+        events: [
+          { ts: EVENT_A, type: 'sign' },
+          { ts: EVENT_B, type: 'lote' },
+          { ts: EVENT_C, type: 'lote' },
+        ],
+        totals: [{ key: 'sign', count: 1n }],
+      }),
+      'day',
+      EC_NOON_JUN22,
+    );
+    const today = res.buckets.find((b) => b.period === '2026-06-22');
+    expect(today).toEqual({
+      period: '2026-06-22',
+      sign: 1,
+      verify: 0,
+      cert: 0,
+      install: 0,
+      lote: 2,
+    });
+    for (const b of res.buckets) expect(typeof b.lote).toBe('number');
+    // 'lote' tiene su propia clave; readTotals solo publica sign/verify/cert: los totales
+    // públicos de GET /api/stats no se mueven por corridas de lote.
+    expect(res.totals).toEqual({ sign: 1, verify: 0, cert: 0 });
   });
 
   test('totals come from usage_counters (default 0 for missing keys)', async () => {
@@ -133,6 +178,13 @@ describe('readSeries — bucketing, zero-fill, since, totals', () => {
       EC_NOON_JUN22,
     );
     const today = res.buckets.find((b) => b.period === '2026-06-22');
-    expect(today).toEqual({ period: '2026-06-22', sign: 1, verify: 0, cert: 0, install: 0 });
+    expect(today).toEqual({
+      period: '2026-06-22',
+      sign: 1,
+      verify: 0,
+      cert: 0,
+      install: 0,
+      lote: 0,
+    });
   });
 });

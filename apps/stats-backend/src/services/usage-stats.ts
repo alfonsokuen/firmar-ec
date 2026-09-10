@@ -16,7 +16,7 @@ import type { PrismaClient } from '@prisma/client';
 // `readTotals`: el shape público de GET /api/stats no cambia (lo consumen la
 // landing y UsageCounter.svelte). La pregunta "¿la app se instala y crece?"
 // se responde con /api/stats/series, que es donde vive el tiempo.
-export type UsageKey = 'sign' | 'verify' | 'cert' | 'install';
+export type UsageKey = 'sign' | 'verify' | 'cert' | 'install' | 'lote';
 
 /**
  * Record one anonymous event: atomically increment the running total and append
