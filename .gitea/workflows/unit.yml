@@ -1,4 +1,4 @@
-# Gate de pruebas UNITARIAS sobre PULL REQUESTS — firmar.ec (monorepo pnpm)
+# Gate de pruebas UNITARIAS sobre PR y push a main — firmar.ec (monorepo pnpm)
 #
 # POR QUÉ EXISTE ESTE ARCHIVO
 # Hasta el 2026-09-02 NINGÚN flujo de CI ejecutaba la suite de vitest: ni los
@@ -87,7 +87,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: unit-${{ github.event.pull_request.number }}
+  group: unit-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -98,6 +98,9 @@ jobs:
     timeout-minutes: 45
 
     env:
+      EVENT_NAME: ${{ github.event_name }}
+      PUSH_SHA: ${{ github.sha }}
+      PUSH_REF: ${{ github.ref_name }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
       HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
@@ -111,6 +114,22 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Push no incluye pull_request: resolver su commit antes del fork-guard.
+          # Un PR sigue usando exclusivamente su propia procedencia y head.
+          case "$EVENT_NAME" in
+            push)
+              if [ "$PUSH_REF" != "main" ]; then
+                echo "Push fuera de main — no se construye" >&2
+                exit 1
+              fi
+              HEAD_SHA="$PUSH_SHA"
+              HEAD_REF="$PUSH_REF"
+              HEAD_REPO="$THIS_REPO"
+              ;;
+            pull_request) ;;
+            *) echo "Evento no soportado: $EVENT_NAME" >&2; exit 1 ;;
+          esac
+
           if [ "$HEAD_REPO" != "$THIS_REPO" ]; then
             echo "PR desde un repo externo ($HEAD_REPO) — no se construye en este runner" >&2
             exit 1
@@ -120,6 +139,9 @@ jobs:
             [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
             *) echo "head.sha ausente o con forma inesperada: '$HEAD_SHA'" >&2; exit 1 ;;
           esac
+
+          # Los pasos posteriores necesitan el contexto resuelto del push.
+          printf 'HEAD_SHA=%s\nHEAD_REF=%s\n' "$HEAD_SHA" "$HEAD_REF" >> "$GITHUB_ENV"
 
           UNITCHECK_DIR="$(cd "$GITHUB_WORKSPACE/.." && pwd)/unitcheck-$HEAD_SHA"
           mkdir -p "$UNITCHECK_DIR"
