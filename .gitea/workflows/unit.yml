@@ -10,11 +10,10 @@
 #
 # QUÉ CORRE Y POR QUÉ ESO Y NO TODO
 # `vitest run apps/pwa packages apps/landing`, acotado a propósito:
-#   - `apps/inbox-backend`, `apps/stats-backend` y `apps/verify-api` quedan
-#     FUERA: sus 13 ficheros de tests ni cargan sin `prisma generate`
-#     (`Cannot find module '.prisma/client/default'`). Incluirlos daría rojo
-#     desde el primer día por algo ajeno al PR. Engancharlos es trabajo aparte
-#     (generar el cliente en el contenedor) y debe hacerse, no ignorarse.
+#   - stats-backend corre primero con su config propia y prisma generate.
+#     Sus regresiones de conteo y límites HTTP también bloquean el merge.
+#   - `apps/inbox-backend` y `apps/verify-api` siguen fuera: necesitan su
+#     propia preparación de Prisma, pendiente fuera del alcance de stats.
 #   - `packages/ltv-validation/tests/property.test.ts` queda FUERA: es una
 #     prueba de propiedades (fast-check) con semilla aleatoria que encontró un
 #     fallo REAL y preexistente (`parseOcspResponse` lanza algo distinto de
@@ -192,7 +191,7 @@ jobs:
             -w /workspace \
             -e CI=1 \
             "$IMG" \
-            sh -c 'apt-get update -qq && apt-get install -y -qq --no-install-recommends libarchive-tools >/dev/null && corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm exec vitest run apps/pwa packages apps/landing --exclude "**/ltv-validation/tests/property.test.ts"')
+            sh -c 'apt-get update -qq && apt-get install -y -qq --no-install-recommends libarchive-tools >/dev/null && corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @firma-ec/stats-backend prisma:generate && pnpm --filter @firma-ec/stats-backend test && pnpm exec vitest run apps/pwa packages apps/landing --exclude "**/ltv-validation/tests/property.test.ts"')
 
           # Streaming en vivo: sin esto el job es una caja negra hasta el final.
           docker logs -f "$CID" 2>&1 &

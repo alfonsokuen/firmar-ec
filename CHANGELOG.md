@@ -5,6 +5,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Landing 0.7.6
+
+- El CTA principal abre directamente la ruta de firma, conservando los parámetros de consulta. Las redirecciones históricas ES/EN de firma también preservan la consulta.
+- Precios ES/EN aclaran el IVA por fila y distinguen solicitud de emisión, sin prometer un plazo universal. La versión inglesa reconoce la venta actual y el papel de la Autoridad de Certificación.
+- Patrocinio muestra la disponibilidad de certificados y retira la etiqueta de popularidad sin evidencia.
+
 ### Fixed
 - **Las guardas del incidente anterior eran, ellas mismas, mudas** (`@firma-ec/pwa` 0.26.2). Una revisión
   con dos agentes independientes sobre el diff completo encontró que lo arreglado el 09-sep estaba bien,

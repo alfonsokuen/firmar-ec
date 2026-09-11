@@ -19,8 +19,8 @@
  * UTC, which matters for a counter people read against their own clock.
  */
 
-export type EventType = 'sign' | 'verify' | 'cert' | 'install';
-export const EVENT_TYPES: readonly EventType[] = ['sign', 'verify', 'cert', 'install'];
+export type EventType = 'sign' | 'verify' | 'cert' | 'install' | 'lote';
+export const EVENT_TYPES: readonly EventType[] = ['sign', 'verify', 'cert', 'install', 'lote'];
 
 export type Granularity = 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
 export const GRANULARITIES: readonly Granularity[] = [
@@ -201,10 +201,11 @@ export interface Counts {
   verify: number;
   cert: number;
   install: number;
+  lote: number;
 }
 
 export function emptyCounts(): Counts {
-  return { sign: 0, verify: 0, cert: 0, install: 0 };
+  return { sign: 0, verify: 0, cert: 0, install: 0, lote: 0 };
 }
 
 /** Full KV key for a period's combined counts. */
@@ -232,14 +233,20 @@ export function parseCounts(raw: string | null): Counts {
     // desde `stats_events` (series-read.ts), que solo usa bumpCount/emptyCounts.
     // Se mantiene tolerante por si vuelve a usarse: `i` no existe en los valores
     // guardados antes de 2026-08-24 y toCount(undefined) da 0.
-    return { sign: toCount(o.s), verify: toCount(o.v), cert: toCount(o.c), install: toCount(o.i) };
+    return {
+      sign: toCount(o.s),
+      verify: toCount(o.v),
+      cert: toCount(o.c),
+      install: toCount(o.i),
+      lote: toCount(o.l),
+    };
   } catch {
     return emptyCounts();
   }
 }
 
 export function serializeCounts(c: Counts): string {
-  return JSON.stringify({ s: c.sign, v: c.verify, c: c.cert, i: c.install });
+  return JSON.stringify({ s: c.sign, v: c.verify, c: c.cert, i: c.install, l: c.lote });
 }
 
 /** Immutably increment one event type in a counts record. */

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 /**
@@ -15,6 +16,7 @@ import { fileURLToPath } from 'node:url';
  * @see apps/pwa/src/ui/firma/PdfPreview.svelte (untrack fix)
  */
 import { type Page, expect, test } from '@playwright/test';
+import { verifyPadesIndependently } from './helpers/lote-verify';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PDF = resolve(HERE, 'fixtures/sample.pdf');
@@ -128,11 +130,20 @@ test.describe('firmar.ec — /firmar wizard', () => {
     await expect(
       page.getByRole('heading', { name: /listo para firmar|ready to sign/i }),
     ).toBeVisible({ timeout: 10_000 });
+    const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: /^firmar pdf$|^sign pdf$/i }).click();
     // Step 6 — success heading.
     await expect(
       page.getByRole('heading', { name: /pdf firmado correctamente|pdf signed successfully/i }),
     ).toBeVisible({ timeout: 30_000 });
+    const download = await downloadPromise;
+    expect(await download.failure()).toBeNull();
+    const report = verifyPadesIndependently(readFileSync((await download.path())!));
+    expect(report, report.failure).toMatchObject({
+      byteRangeCoversDocument: true,
+      digestMatches: true,
+      signatureValid: true,
+    });
     expect(cap.errors.filter((e) => /effect_update_depth_exceeded/.test(e))).toEqual([]);
   });
 

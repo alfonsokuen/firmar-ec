@@ -16,7 +16,7 @@ import type { PrismaClient } from '@prisma/client';
 // `readTotals`: el shape público de GET /api/stats no cambia (lo consumen la
 // landing y UsageCounter.svelte). La pregunta "¿la app se instala y crece?"
 // se responde con /api/stats/series, que es donde vive el tiempo.
-export type UsageKey = 'sign' | 'verify' | 'cert' | 'install';
+export type UsageKey = 'sign' | 'verify' | 'cert' | 'install' | 'lote';
 
 /**
  * Record one anonymous event: atomically increment the running total and append
@@ -41,18 +41,25 @@ export interface Totals {
   sign: number;
   verify: number;
   cert: number;
+  lote: number;
 }
 
-/** Read the running totals for the three known keys (default 0). */
+/**
+ * Read the running totals for the four counted keys (default 0). `lote` is
+ * included here (the series' `totals` field) but `toResponse` in routes/stats.ts
+ * builds the public `GET /api/stats` shape by hand from `sign`/`verify`/`cert`
+ * only — adding a field here can never leak into that 4-field contract.
+ */
 export async function readTotals(prisma: PrismaClient): Promise<Totals> {
   const rows = await prisma.$queryRaw<Array<{ key: string; count: bigint }>>`
     SELECT "key", "count" FROM "usage_counters"
-    WHERE "key" IN ('sign', 'verify', 'cert')
+    WHERE "key" IN ('sign', 'verify', 'cert', 'lote')
   `;
   const byKey = new Map(rows.map((r) => [r.key, Number(r.count)]));
   return {
     sign: byKey.get('sign') ?? 0,
     verify: byKey.get('verify') ?? 0,
     cert: byKey.get('cert') ?? 0,
+    lote: byKey.get('lote') ?? 0,
   };
 }
