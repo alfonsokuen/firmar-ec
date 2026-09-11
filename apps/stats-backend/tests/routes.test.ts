@@ -95,12 +95,12 @@ describe('GET /api/stats/series — validation', () => {
       granularity: string;
       since: string;
       buckets: Array<{ period: string; sign: number; verify: number; cert: number }>;
-      totals: { sign: number; verify: number; cert: number };
+      totals: { sign: number; verify: number; cert: number; lote: number };
     };
     expect(body.granularity).toBe('day');
     expect(typeof body.since).toBe('string');
     expect(body.buckets).toHaveLength(30);
-    expect(body.totals).toEqual({ sign: 5, verify: 3, cert: 1 });
+    expect(body.totals).toEqual({ sign: 5, verify: 3, cert: 1, lote: 0 });
     expect(res.headers['cache-control']).toBe('public, max-age=300');
   });
 });

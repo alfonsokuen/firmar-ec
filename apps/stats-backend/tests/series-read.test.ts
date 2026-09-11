@@ -123,7 +123,10 @@ describe('readSeries — bucketing, zero-fill, since, totals', () => {
           { ts: EVENT_B, type: 'lote' },
           { ts: EVENT_C, type: 'lote' },
         ],
-        totals: [{ key: 'sign', count: 1n }],
+        totals: [
+          { key: 'sign', count: 1n },
+          { key: 'lote', count: 2n },
+        ],
       }),
       'day',
       EC_NOON_JUN22,
@@ -138,14 +141,16 @@ describe('readSeries — bucketing, zero-fill, since, totals', () => {
       lote: 2,
     });
     for (const b of res.buckets) expect(typeof b.lote).toBe('number');
-    // 'lote' tiene su propia clave; readTotals solo publica sign/verify/cert: los totales
-    // públicos de GET /api/stats no se mueven por corridas de lote.
-    expect(res.totals).toEqual({ sign: 1, verify: 0, cert: 0 });
+    // 'lote' SÍ aparece en los totales de la serie (readTotals ahora lo incluye) —
+    // lo que NUNCA cambia es el shape público de 4 campos de GET /api/stats
+    // (toResponse en routes/stats.ts lo construye a mano leyendo solo
+    // sign/verify/cert, así que 'lote' no puede colarse ahí).
+    expect(res.totals).toEqual({ sign: 1, verify: 0, cert: 0, lote: 2 });
   });
 
   test('totals come from usage_counters (default 0 for missing keys)', async () => {
     const res = await readSeries(mockPrisma(), 'day', EC_NOON_JUN22);
-    expect(res.totals).toEqual({ sign: 2, verify: 1, cert: 0 });
+    expect(res.totals).toEqual({ sign: 2, verify: 1, cert: 0, lote: 0 });
   });
 
   test('since = EC-local civil day of the first event', async () => {
