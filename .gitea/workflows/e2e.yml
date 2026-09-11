@@ -229,7 +229,7 @@ jobs:
             -w /workspace \
             -e CI=1 \
             "$IMG" \
-            sh -c 'corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @firma-ec/pwa exec playwright test --project=chromium')
+            sh -c 'apt-get update -qq && apt-get install -y -qq --no-install-recommends libarchive-tools >/dev/null && corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @firma-ec/pwa exec playwright test --project=chromium')
 
           # Streaming en vivo: sin esto, el job es una caja negra mientras
           # corre -- `docker wait` no imprime NADA hasta que el contenedor
