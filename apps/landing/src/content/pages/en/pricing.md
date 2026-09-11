@@ -3,7 +3,7 @@ title: "Electronic Signature Pricing in Ecuador 2026"
 description: "2026 price table for electronic signatures in Ecuador by accredited ECI: BCE, Security Data, UANATACA, iCert-EC and more. Costs for SRI or personal use."
 lang: en
 datePublished: "2026-05-29"
-dateModified: "2026-08-24"
+dateModified: "2026-09-11"
 h1: "How Much Does an Electronic Signature Cost in Ecuador? 2026 Pricing"
 breadcrumbs:
   - { name: "Electronic signature pricing 2026", url: "https://firmar.ec/en/pricing/" }
@@ -33,7 +33,7 @@ they are being replaced by sourced figures.
 which states verbatim *"Todos los precios incluyen IVA"* (checked 24 August 2026).
 ICERT-EC: official Judiciary Council rate.
 
-| ECI | Mode | Validity | Reference price (+ VAT) | Type |
+| ECI | Mode | Validity | Reference price (VAT per row) | Type |
 |---|---|---|---|---|
 | **ICERT-EC (Judiciary Council)** | `.p12` or token | 2 years | **USD 19.80** *(official rate)* | Public |
 | **Banco Central del Ecuador (BCE)** | `.p12` or token | 2 years | **USD ~28** | Public |
@@ -50,12 +50,12 @@ ICERT-EC: official Judiciary Council rate.
 
 [See full comparison of 17+ accredited ECIs →](/en/certificate-issuers-ecuador/)
 
-> **These prices are not firmar.ec quotes.** Each price is charged by the ECI directly. We don't (yet) resell their certificates.
+> **These reference prices are not firmar.ec quotes.** We sell UANATACA · Namirial certificates at [tienda.firmar.ec](https://tienda.firmar.ec/). This comparison also lists other issuers; check their own channels for current prices.
 
 ## What price fits you? Quick guide
 
 - **Cheapest for occasional use**: ICERT-EC (USD 19.80 + VAT, 2 years), in-person.
-- **Need it today / this week**: ArgosData, UANATACA, Datil, or ANF AC — remote video ID, 24–72 hours.
+- **Need it today / this week**: ArgosData, UANATACA, Datil, or ANF AC offer remote video ID. Confirm the timeline with the provider: submitting an application is not the same as receiving the certificate; issuance depends on identity approval and payment.
 - **Accountant / daily SRI invoices**: Security Data, UANATACA, Eclipsoft, or BCE.
 - **Sign from mobile / web (PWA)**: any ECI issuing `.p12` (most of them).
 - **Company with multiple signers in the cloud**: UANATACA, ANF AC, Lazzate.
@@ -63,11 +63,11 @@ ICERT-EC: official Judiciary Council rate.
 
 ## Does the price include VAT?
 
-**No**, listed prices are **before VAT (15%)**. Total = `price + 15% VAT`. Example: ICERT-EC USD 19.80 + VAT = **USD 22.77 total**.
+**It depends on the row.** Rows marked `VAT incl.` already show the total. For the other prices, add VAT (15%): `price + 15% VAT`. Example: ICERT-EC USD 19.80 + VAT = **USD 22.77 total**.
 
 ### Our store, compared on the same basis
 
-The table above lists prices *before* VAT, as each ECI publishes them. At
+The table distinguishes prices *including* VAT from prices *before* VAT in each row. At
 [tienda.firmar.ec](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=pricing-table-en) the price
 you see **is already final**: the 1-year `.p12` certificate is **USD 23.60, VAT
 included** (USD 20.52 + VAT on the table's basis). Issued fully online by
@@ -108,9 +108,9 @@ When comparing offers, always check whether the advertised figure carries VAT: a
 
 > **Conclusion:** for signing in Ecuador with full legal validity, the **cheapest and correct** option is a certificate from an ARCOTEL-accredited ECI. DocuSign and similar work for private contracts that accept that mechanism, but **not for SRI, ECUAPASS, or Quipux**.
 
-## Will firmar.ec sell certificates?
+## Does firmar.ec sell certificates?
 
-**Yes, since July 2026.** We issue **UANATACA · Namirial** `.p12` certificates with
+**Yes, since July 2026.** We sell `.p12` certificates issued by **UANATACA · Namirial** with
 remote video identification at
 [tienda.firmar.ec](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=pricing-faq-en), fully
 online, no in-person appointment. The price shown there **already includes VAT**:
@@ -119,10 +119,10 @@ the 1-year certificate is **USD 23.60 final**.
 The signing tool on this site stays **free and open source**, and will: it works
 with a certificate from any accredited ECI, wherever you bought it.
 
-Meanwhile, recommended flow:
+Recommended flow:
 
 1. **Pick your ECI** at [ARCOTEL ECIs comparison](/en/certificate-issuers-ecuador/).
-2. **Apply directly on its official site**. You pay the ECI, not us.
+2. **Apply through your chosen provider**. You can buy UANATACA · Namirial certificates at [our store](https://tienda.firmar.ec/); the Certification Authority issues them. For other issuers, check their official channels.
 3. **Once you have your `.p12`**, open [app.firmar.ec](https://app.firmar.ec) and sign. Free, no install, also from mobile.
 
 ## FAQ

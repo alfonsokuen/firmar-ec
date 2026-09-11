@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 /**
@@ -10,6 +11,8 @@ import { fileURLToPath } from 'node:url';
  * inadvertido (fue exactamente lo que ocurrió).
  */
 import { type Page, expect, test } from '@playwright/test';
+import { extractWithForeignTool } from '../../src/lib/export/foreignZipExtract.fixture';
+import { verifyPadesIndependently } from './helpers/lote-verify';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..', '..', '..');
@@ -100,6 +103,23 @@ test.describe('firmar.ec — /firmar-lote', () => {
 
     await expect.poll(() => events.filter((event) => event === '?type=lote').length).toBe(1);
     expect(events).not.toContain('?type=sign');
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('link', { name: /descargar zip|download zip/i }).click();
+    const download = await downloadPromise;
+    expect(await download.failure()).toBeNull();
+    const entries = await extractWithForeignTool(
+      new Blob([readFileSync((await download.path())!)]),
+    );
+    expect(entries.size).toBe(2);
+    for (const [name, pdf] of entries) {
+      expect(name).toMatch(/\.pdf$/i);
+      const report = verifyPadesIndependently(pdf);
+      expect(report, `${name}: ${report.failure ?? ''}`).toMatchObject({
+        byteRangeCoversDocument: true,
+        digestMatches: true,
+        signatureValid: true,
+      });
+    }
     expect(cap.errors).toEqual([]);
   });
 

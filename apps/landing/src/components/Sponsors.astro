@@ -193,14 +193,14 @@ const enterprisePerks = es
       'Licencia comercial: integrar firmar.ec en sistemas propietarios/cerrados sin liberar tu código (lo que la AGPL no permite gratis)',
       'SLA y soporte dedicado por contrato',
       'Integración a medida: API, SSO, firma masiva, white-label',
-      'Emisión de certificados (próximamente)',
+      'Certificados UANATACA · Namirial disponibles en tienda.firmar.ec',
       'Reconocimiento como Patrocinador Fundador (instituciones / gobierno / GADs)',
     ]
   : [
       'Commercial license: integrate firmar.ec into proprietary/closed systems without releasing your code (which the AGPL does not allow for free)',
       'Contractual SLA and dedicated support',
       'Custom integration: API, SSO, bulk signing, white-label',
-      'Certificate issuance (coming soon)',
+      'UANATACA · Namirial certificates available at tienda.firmar.ec',
       'Recognition as Founding Sponsor (institutions / government)',
     ];
 
@@ -305,11 +305,6 @@ const steps = es
             : 'border border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-900'
         }`}
       >
-        {tier.featured && (
-          <span class="absolute -top-3 left-6 inline-flex items-center h-6 px-2.5 rounded-full bg-brand-500 text-white text-[11px] font-semibold uppercase tracking-wider">
-            {es ? 'Más elegido' : 'Most chosen'}
-          </span>
-        )}
         <div class="flex items-center gap-3 mb-4">
           <span class="w-9 h-9 rounded-md bg-brand-500/10 flex items-center justify-center shrink-0">
             <span class={`${tier.icon} text-lg text-brand-500`} aria-hidden="true"></span>

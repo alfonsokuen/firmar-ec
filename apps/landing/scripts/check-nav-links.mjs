@@ -45,6 +45,10 @@ for (const { file, lang } of PAGES) {
   const html = await readFile(path.join(DIST, file), 'utf8');
   const header = region(html, 'header');
   const footer = region(html, 'footer');
+  const signCta = html.match(/<a\b[^>]*\bdata-cta="firmar"[^>]*>/)?.[0];
+  if (!signCta?.includes('href="https://app.firmar.ec/#/firmar"')) {
+    errors.push(`${file}: el CTA de firma debe abrir directamente la ruta de firma en la app`);
+  }
 
   if (header === null) {
     errors.push(`${file}: no encuentro <header> — ¿cambió la plantilla?`);

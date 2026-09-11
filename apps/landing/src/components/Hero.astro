@@ -1,6 +1,7 @@
 ---
 import { getLangFromUrl, localizedUrl, useTranslations } from '../i18n/utils.ts';
 import { storeLink } from '../lib/store.ts';
+import { signUrl } from '../lib/pwa.ts';
 import Badge from './Badge.astro';
 import HeroAnimation from './HeroAnimation.svelte';
 import HeroSeal from './HeroSeal.astro';
@@ -11,6 +12,14 @@ const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 const buyUrl = storeLink('hero');
 ---
+<script>
+  import { signUrl } from '../lib/pwa.ts';
+
+  // Static pages cannot read the visitor's query at build time.
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('a[data-cta="firmar"]')) {
+    link.href = signUrl(window.location.search);
+  }
+</script>
 <section class="hero container relative pt-6 md:pt-6 pb-10 md:pb-8 lt-md:pt-4 text-center md:text-left" aria-labelledby="hero-title">
   <!-- Mobile-only ambient backdrop: soft brand glow + faded dot grid. Decorative,
        GPU-cheap (static gradients), pointer-events-none, hidden ≥768px so desktop
@@ -67,7 +76,7 @@ const buyUrl = storeLink('hero');
          lt-md:* utilities collapse to the original inline flex-wrap row at ≥768px. -->
     <div class="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-start md:gap-2.5 mb-5 lt-md:mb-5">
       <a
-        href={localizedUrl('firmar', lang)}
+        href={signUrl()}
         data-cta="firmar"
         class="inline-flex items-center gap-2 px-6 py-3.5 rounded-lg bg-brand-500 text-white font-semibold shadow-[0_8px_32px_-8px_color-mix(in_oklch,oklch(52%_0.18_240)_50%,transparent)] ring-1 ring-brand-600/30 hover:shadow-[0_16px_40px_-8px_color-mix(in_oklch,oklch(52%_0.18_240)_65%,transparent)] hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0 transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] min-h-11 lt-md:w-full lt-md:justify-center"
       >
