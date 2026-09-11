@@ -12,7 +12,7 @@
  * trivial inflation and silently drop (204) over-limit hits rather than count
  * them. GET is cached briefly to shield the DB from landing traffic spikes.
  */
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { Env } from '../env.js';
 import { StatsError } from '../lib/errors.js';
@@ -22,6 +22,14 @@ import { type Granularity, isGranularity } from '../services/series.js';
 import { type Totals, readTotals, recordEvent } from '../services/usage-stats.js';
 
 const EventBody = z.object({ type: z.enum(['sign', 'verify', 'cert', 'install', 'lote']) });
+
+// One parser for accounting and HTTP buckets: query takes precedence even when
+// invalid; arbitrary input must never become a distinct limiter key.
+function parseEvent(req: FastifyRequest) {
+  const fromQuery = (req.query as { type?: unknown } | undefined)?.type;
+  const fromBody = (req.body as { type?: unknown } | null)?.type;
+  return EventBody.safeParse({ type: fromQuery ?? fromBody });
+}
 
 const CACHE_TTL_MS = 60_000;
 
@@ -65,54 +73,70 @@ export default async function statsRoutes(
   const useCache = env.NODE_ENV !== 'test';
   let cache: { at: number; data: StatsResponse } | null = null;
 
-  app.post('/api/stats/event', async (req, reply) => {
-    // Accept the type from a query param (so navigator.sendBeacon can fire a
-    // body-less, CORS-preflight-free POST) or a JSON body.
-    const fromQuery = (req.query as { type?: unknown } | undefined)?.type;
-    const fromBody = (req.body as { type?: unknown } | null)?.type;
-    const parsed = EventBody.safeParse({ type: fromQuery ?? fromBody });
-    if (!parsed.success) {
-      throw new StatsError(
-        'invalid_input',
-        "type must be 'sign', 'verify', 'cert', 'install' or 'lote'",
-      );
-    }
-
-    // 20 events/hour per type. Named per-IP, but `req.ip` resolves to an internal
-    // address behind the tunnel, so each type has a bucket shared by every
-    // visitor — see the drop warning below.
-    // Fail OPEN and LOUD: if Redis is down the limiter is skipped (we'd rather
-    // count an event than 500 the beacon or silently drop it).
-    try {
-      const rl = await checkAndConsume(app.redis.client, {
-        key: `rl:stats:${req.ip || 'unknown'}:${parsed.data.type}`,
-        capacity: 20,
-        refillPerSec: 20 / 3_600,
-      });
-      if (!rl.ok) {
-        // Accept-and-ignore towards the client: don't leak limiter state.
-        // But NEVER drop it silently on our side. `req.ip` is an internal
-        // address of our own overlay network (all public traffic arrives
-        // through the tunnel), so this bucket is GLOBAL, not per-visitor:
-        // once it empties, real events stop being counted and the published
-        // figure falls short with nothing to show for it. Measured against
-        // production 2026-08-24: 1498/1498 logged requests carried a private
-        // address, 0 public. This warning is the only trace that a real
-        // operation went uncounted.
-        app.log.warn(
-          { retryAfterS: rl.retryAfterS, type: parsed.data.type },
-          'stats event DROPPED by the shared rate-limit bucket — published counters now under-report',
+  app.post(
+    '/api/stats/event',
+    {
+      config: {
+        rateLimit: {
+          max: 100,
+          timeWindow: '1 minute',
+          // JSON bodies are available here; onRequest would put body-only beacons
+          // in the invalid bucket. This overrides the general HTTP bucket.
+          hook: 'preValidation',
+          keyGenerator: (req: FastifyRequest) => {
+            const parsed = parseEvent(req);
+            return `${req.ip}:${parsed.success ? parsed.data.type : 'invalid'}`;
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      // Accept the type from a query param (so navigator.sendBeacon can fire a
+      // body-less, CORS-preflight-free POST) or a JSON body.
+      const parsed = parseEvent(req);
+      if (!parsed.success) {
+        throw new StatsError(
+          'invalid_input',
+          "type must be 'sign', 'verify', 'cert', 'install' or 'lote'",
         );
-        return reply.code(204).send();
       }
-    } catch (e) {
-      app.log.warn({ err: e }, 'stats rate-limit unavailable, failing open');
-    }
 
-    await recordEvent(app.prisma, parsed.data.type);
-    cache = null; // next GET recomputes
-    return reply.code(204).send();
-  });
+      // 20 events/hour per type. Named per-IP, but `req.ip` resolves to an internal
+      // address behind the tunnel, so each type has a bucket shared by every
+      // visitor — see the drop warning below.
+      // Fail OPEN and LOUD: if Redis is down the limiter is skipped (we'd rather
+      // count an event than 500 the beacon or silently drop it).
+      try {
+        const rl = await checkAndConsume(app.redis.client, {
+          key: `rl:stats:${req.ip || 'unknown'}:${parsed.data.type}`,
+          capacity: 20,
+          refillPerSec: 20 / 3_600,
+        });
+        if (!rl.ok) {
+          // Accept-and-ignore towards the client: don't leak limiter state.
+          // But NEVER drop it silently on our side. `req.ip` is an internal
+          // address of our own overlay network (all public traffic arrives
+          // through the tunnel), so this bucket is GLOBAL, not per-visitor:
+          // once it empties, real events stop being counted and the published
+          // figure falls short with nothing to show for it. Measured against
+          // production 2026-08-24: 1498/1498 logged requests carried a private
+          // address, 0 public. This warning is the only trace that a real
+          // operation went uncounted.
+          app.log.warn(
+            { retryAfterS: rl.retryAfterS, type: parsed.data.type },
+            'stats event DROPPED by the shared rate-limit bucket — published counters now under-report',
+          );
+          return reply.code(204).send();
+        }
+      } catch (e) {
+        app.log.warn({ err: e }, 'stats rate-limit unavailable, failing open');
+      }
+
+      await recordEvent(app.prisma, parsed.data.type);
+      cache = null; // next GET recomputes
+      return reply.code(204).send();
+    },
+  );
 
   app.get('/api/stats', async (_req, reply) => {
     reply.header('cache-control', 'public, max-age=60');
