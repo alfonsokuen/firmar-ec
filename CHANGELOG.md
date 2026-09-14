@@ -5,6 +5,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Added
+- El QR de las nuevas firmas visibles también se puede pulsar para abrir el verificador de firmar.ec. El receptor selecciona el PDF y la validación sigue siendo local. Disponible en firma única y multifirma, con la zona pulsable ajustada a la rotación de la página. El enlace se incorpora antes de firmar; los PDF ya emitidos no cambian.
+
 ### Fixed
 - **Las guardas del incidente anterior eran, ellas mismas, mudas** (`@firma-ec/pwa` 0.26.2). Una revisión
   con dos agentes independientes sobre el diff completo encontró que lo arreglado el 09-sep estaba bien,

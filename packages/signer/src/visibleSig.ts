@@ -56,6 +56,7 @@ import {
 } from 'pdf-lib';
 import QRCode from 'qrcode';
 import { SignerError } from './errors.js';
+import { createQrLink } from './qrLink.js';
 import { toWinAnsiHex as toWinAnsiHexString, widthOfText } from './textFit.js';
 
 /** Public input for a visible signature placement (Batch 5 contract). */
@@ -626,6 +627,18 @@ export function attachVisibleSignatureAppearance(
 
   // Note: we don't override /T (field name); pdflibAddPlaceholder sets it to
   // 'Signature1' and the @signpdf incremental path expects that.
+
+  // Add the link before ByteRange/CMS are calculated; the text area keeps
+  // the signature widget's normal certificate-details interaction.
+  if (spec.qrUrl) {
+    const link = createQrLink(pdfDoc, spec, spec.qrUrl, [
+      PADDING_PT,
+      PADDING_PT,
+      PADDING_PT + QR_AREA_PT,
+      PADDING_PT + QR_AREA_PT,
+    ]);
+    pdfDoc.getPage(spec.page).node.addAnnot(ctx.register(link));
+  }
 
   return { widget, appearanceStream: apStream };
 }

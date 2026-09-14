@@ -62,6 +62,7 @@ import { buildCmsSignedData } from './cms.js';
 import { detectSignatures } from './detectExistingSignatures.js';
 import { SignerError, isEncryptedPdfError } from './errors.js';
 import type { PadesSignOptions } from './pades.js';
+import { createQrLink } from './qrLink.js';
 import { fitChars, toWinAnsiHex, truncateToWidth } from './textFit.js';
 import type { ParsedPfx, SigAlg } from './types.js';
 import { buildVerifyQrUrl } from './verifyUrl.js';
@@ -300,6 +301,7 @@ export async function addIncrementalSignature(
   //   - QR a la izquierda (60×60 con padding) codificando la URL del verifier
   //     con los primeros 12 hex chars del SHA-256 del PDF de entrada — match
   //     con lo que hace signPdfPades para single-sig (pades.ts:212).
+  let qrLinkPart: { objNum: number; genNum: number; text: string } | undefined;
   let apStreamBody: string;
   let apResources: string;
   if (visible) {
@@ -356,6 +358,13 @@ export async function addIncrementalSignature(
     const moduleSize = qrAreaPt / size;
     const qrX = padding; // QR origin = bottom-left corner of QR area inside BBox
     const qrY = h - padding - qrAreaPt;
+    const linkObjNum = nextObjNum++;
+    const link = createQrLink(stub, vs!, qrUrl, [qrX, qrY, qrX + qrAreaPt, qrY + qrAreaPt]);
+    qrLinkPart = {
+      objNum: linkObjNum,
+      genNum: 0,
+      text: `${linkObjNum} 0 obj\n${link.toString()}\nendobj\n`,
+    };
     const qrOps: string[] = ['0 0 0 rg'];
     for (let row = 0; row < size; row++) {
       let runStart = -1;
@@ -559,6 +568,7 @@ export async function addIncrementalSignature(
   //     entry with `[N G R newRef]` nested the old array inside the new one,
   //     which is illegal per ISO 32000-1 §12.5.2 and made viewers drop every
   //     prior widget annotation, hiding existing signature stamps).
+  const newAnnotRefs = `${widgetObjNum} 0 R${qrLinkPart ? ` ${qrLinkPart.objNum} 0 R` : ''}`;
   let pageObjText: string | null = null;
   const annotsLiteralMatch = targetPageBody.match(/\/Annots\s*\[([^\]]*)\]/);
   const annotsIndirectMatch = annotsLiteralMatch
@@ -571,10 +581,11 @@ export async function addIncrementalSignature(
     extraParts.push({
       objNum: an,
       genNum: ag,
-      text: `${an} ${ag} obj\n[${inner.length > 0 ? `${inner} ` : ''}${widgetObjNum} 0 R]\nendobj\n`,
+      text: `${an} ${ag} obj\n[${inner.length > 0 ? `${inner} ` : ''}${newAnnotRefs}]\nendobj\n`,
     });
   } else {
-    const pageBody = injectAnnot(targetPageBody, widgetObjNum, 0);
+    let pageBody = injectAnnot(targetPageBody, widgetObjNum, 0);
+    if (qrLinkPart) pageBody = injectAnnot(pageBody, qrLinkPart.objNum, 0);
     pageObjText =
       `${targetPageRef.objectNumber} ${targetPageRef.generationNumber} obj\n` +
       `${pageBody}\n` +
@@ -603,6 +614,7 @@ export async function addIncrementalSignature(
   parts.push({ objNum: sigObjNum, genNum: 0, text: sigObjText });
   parts.push({ objNum: apObjNum, genNum: 0, text: apObjText });
   parts.push({ objNum: widgetObjNum, genNum: 0, text: widgetObjText });
+  if (qrLinkPart) parts.push(qrLinkPart);
   parts.push({
     objNum: info.catalogRef.objectNumber,
     genNum: info.catalogRef.generationNumber,

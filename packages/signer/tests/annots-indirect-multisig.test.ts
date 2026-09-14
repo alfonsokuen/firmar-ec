@@ -111,12 +111,20 @@ describe('multi-firma con /Annots indirecto (iText-style) — los widgets previo
       expect(resolved).toBeInstanceOf(PDFDict);
     }
 
-    // Los refs previos siguen todos colgados de la página + exactamente 1 nuevo.
+    // Los refs previos siguen colgados de la página; se suman el widget y el enlace QR.
     const inRefs = annotRefStrings(inDoc, TARGET_PAGE);
     const outRefs = annotRefStrings(outDoc, TARGET_PAGE);
     expect(inRefs.length).toBeGreaterThan(0);
     for (const r of inRefs) expect(outRefs).toContain(r);
-    expect(outRefs.length).toBe(inRefs.length + 1);
+    expect(outRefs.length).toBe(inRefs.length + 2);
+    const addedTypes = [];
+    for (let i = 0; i < arr!.size(); i++) {
+      if (!inRefs.includes(arr!.get(i).toString())) {
+        const annot = outDoc.context.lookup(arr!.get(i), PDFDict);
+        addedTypes.push(annot.get(PDFName.of('Subtype'))!.toString());
+      }
+    }
+    expect(addedTypes.sort()).toEqual(['/Link', '/Widget']);
 
     // Y hay una firma más que antes.
     const priorSigs = await detectSignatures(input);
