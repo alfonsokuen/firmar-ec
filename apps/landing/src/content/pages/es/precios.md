@@ -3,7 +3,7 @@ title: "Precios de firma electrónica en Ecuador 2026"
 description: "Precios 2026 de la firma electrónica en Ecuador por ECI acreditada: BCE, Security Data, UANATACA, iCert-EC y más. Cuánto cuesta para SRI o uso personal."
 lang: es
 datePublished: "2026-05-29"
-dateModified: "2026-08-24"
+dateModified: "2026-09-11"
 h1: "¿Cuánto cuesta una firma electrónica en Ecuador? Precios 2026"
 breadcrumbs:
   - { name: "Precios de firma electrónica 2026", url: "https://firmar.ec/precios/" }
@@ -29,7 +29,7 @@ las filas verificadas con precio final; el resto son cifras *antes* de IVA (15%)
 Las filas con `~` son rangos de referencia que aún no hemos podido verificar
 contra una tarifa publicada — se irán sustituyendo por cifras con fuente.
 
-| ECI | Modalidad | Vigencia | Precio referencial (+ IVA) | Tipo |
+| ECI | Modalidad | Vigencia | Precio referencial (IVA según fila) | Tipo |
 |---|---|---|---|---|
 | **ICERT-EC (Consejo de la Judicatura)** | Archivo `.p12` o token | 2 años | **USD 19,80** *(tarifa oficial)* | Pública |
 | **Banco Central del Ecuador (BCE)** | Archivo `.p12` o token | 2 años | **USD ~28** | Pública |
@@ -65,7 +65,7 @@ agosto de 2026). ICERT-EC: tarifa oficial del Consejo de la Judicatura.
 **ICERT-EC** (USD 19,80 + IVA, 2 años). Es la tarifa oficial más baja y se trámita en persona en cualquier oficina judicial.
 
 ### Lo necesito hoy / esta semana
-**ArgosData, UANATACA, Datil o ANF AC** ofrecen **video-identificación remota** y emisión en 24–72 horas. Pagas un poco más que las opciones presenciales (USD 20–40 + IVA) pero sin tener que ir a una oficina.
+**ArgosData, UANATACA, Datil o ANF AC** ofrecen **video-identificación remota**. Confirma el plazo con el proveedor: completar la solicitud no equivale a recibir el certificado; la emisión depende de la validación de identidad y del pago.
 
 ### Soy contador / firmo facturas SRI a diario
 **Security Data, UANATACA, Eclipsoft o BCE** son las más usadas en software contable ecuatoriano (Odoo, sistemas internos, contifico). Cualquiera de las cuatro funciona; la elección suele ser por **soporte técnico** y **renovación automatizada**.
@@ -81,12 +81,12 @@ ECIs públicas (**BCE, ICERT-EC, Registro Civil**) son las que tienen mejor comp
 
 ## ¿El precio incluye IVA?
 
-**No**, los precios listados son **antes de IVA (15%)**. El total que pagas se calcula como `precio + 15% IVA`. Por ejemplo, ICERT-EC USD 19,80 + IVA = **USD 22,77 total**.
+**Depende de la fila.** Las marcadas `IVA incl.` ya muestran el total; a las demás se añade el IVA (15%). Para las cifras sin IVA, el total se calcula como `precio + 15% IVA`. Por ejemplo, ICERT-EC USD 19,80 + IVA = **USD 22,77 total**.
 
 ### Nuestra tienda, para comparar en la misma base
 
-Los precios de la tabla de arriba son **antes de IVA**, tal como los publica cada
-ECI. En [tienda.firmar.ec](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=precios-tabla)
+La tabla distingue precios **con IVA incluido** y **antes de IVA** según cada fila.
+En [tienda.firmar.ec](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=precios-tabla)
 el precio que ves **ya es el final**: el certificado `.p12` de 1 año cuesta
 **USD 23,60 con IVA incluido** (equivalente a USD 20,52 + IVA en la base de la
 tabla). Emisión 100% en línea con UANATACA · Namirial.
@@ -138,10 +138,10 @@ La herramienta de firma de este sitio sigue siendo **gratis y open source**, y l
 seguirá siendo: funciona con el certificado de cualquier ECI acreditada, lo hayas
 comprado donde lo hayas comprado.
 
-Mientras tanto, el flujo recomendado es:
+El flujo recomendado es:
 
 1. **Elige tu ECI** en [comparativa de ECIs ARCOTEL](/comparativa-emisores-ecuador/).
-2. **Solicítala directamente en su sitio oficial**. Pagas a la ECI, no a nosotros.
+2. **Solicita el certificado al proveedor elegido**. Puedes comprar el de UANATACA · Namirial en [nuestra tienda](https://tienda.firmar.ec/); la Autoridad de Certificación lo emite. Para otros emisores, consulta sus canales oficiales.
 3. **Cuando recibas tu `.p12`**, abre [app.firmar.ec](https://app.firmar.ec) y firma. Gratis, sin instalación, también desde el celular.
 
 ## Preguntas frecuentes

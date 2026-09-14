@@ -5,8 +5,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
-### Added
+### PWA 0.27.0 / signer 0.12.0 — 2026-09-14
 - El QR de las nuevas firmas visibles también se puede pulsar para abrir el verificador de firmar.ec. El receptor selecciona el PDF y la validación sigue siendo local. Disponible en firma única y multifirma, con la zona pulsable ajustada a la rotación de la página. El enlace se incorpora antes de firmar; los PDF ya emitidos no cambian.
+
+### Landing 0.7.6
+
+- El CTA principal abre directamente la ruta de firma, conservando los parámetros de consulta. Las redirecciones históricas ES/EN de firma también preservan la consulta.
+- Precios ES/EN aclaran el IVA por fila y distinguen solicitud de emisión, sin prometer un plazo universal. La versión inglesa reconoce la venta actual y el papel de la Autoridad de Certificación.
+- Patrocinio muestra la disponibilidad de certificados y retira la etiqueta de popularidad sin evidencia.
 
 ### Fixed
 - **Las guardas del incidente anterior eran, ellas mismas, mudas** (`@firma-ec/pwa` 0.26.2). Una revisión

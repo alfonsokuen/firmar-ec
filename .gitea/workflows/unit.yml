@@ -1,4 +1,4 @@
-# Gate de pruebas UNITARIAS sobre PULL REQUESTS — firmar.ec (monorepo pnpm)
+# Gate de pruebas UNITARIAS sobre PR y push a main — firmar.ec (monorepo pnpm)
 #
 # POR QUÉ EXISTE ESTE ARCHIVO
 # Hasta el 2026-09-02 NINGÚN flujo de CI ejecutaba la suite de vitest: ni los
@@ -10,11 +10,10 @@
 #
 # QUÉ CORRE Y POR QUÉ ESO Y NO TODO
 # `vitest run apps/pwa packages apps/landing`, acotado a propósito:
-#   - `apps/inbox-backend`, `apps/stats-backend` y `apps/verify-api` quedan
-#     FUERA: sus 13 ficheros de tests ni cargan sin `prisma generate`
-#     (`Cannot find module '.prisma/client/default'`). Incluirlos daría rojo
-#     desde el primer día por algo ajeno al PR. Engancharlos es trabajo aparte
-#     (generar el cliente en el contenedor) y debe hacerse, no ignorarse.
+#   - stats-backend corre primero con su config propia y prisma generate.
+#     Sus regresiones de conteo y límites HTTP también bloquean el merge.
+#   - `apps/inbox-backend` y `apps/verify-api` siguen fuera: necesitan su
+#     propia preparación de Prisma, pendiente fuera del alcance de stats.
 #   - `packages/ltv-validation/tests/property.test.ts` queda FUERA: es una
 #     prueba de propiedades (fast-check) con semilla aleatoria que encontró un
 #     fallo REAL y preexistente (`parseOcspResponse` lanza algo distinto de
@@ -87,7 +86,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: unit-${{ github.event.pull_request.number }}
+  group: unit-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -98,6 +97,9 @@ jobs:
     timeout-minutes: 45
 
     env:
+      EVENT_NAME: ${{ github.event_name }}
+      PUSH_SHA: ${{ github.sha }}
+      PUSH_REF: ${{ github.ref_name }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
       HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
@@ -111,6 +113,22 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Push no incluye pull_request: resolver su commit antes del fork-guard.
+          # Un PR sigue usando exclusivamente su propia procedencia y head.
+          case "$EVENT_NAME" in
+            push)
+              if [ "$PUSH_REF" != "main" ]; then
+                echo "Push fuera de main — no se construye" >&2
+                exit 1
+              fi
+              HEAD_SHA="$PUSH_SHA"
+              HEAD_REF="$PUSH_REF"
+              HEAD_REPO="$THIS_REPO"
+              ;;
+            pull_request) ;;
+            *) echo "Evento no soportado: $EVENT_NAME" >&2; exit 1 ;;
+          esac
+
           if [ "$HEAD_REPO" != "$THIS_REPO" ]; then
             echo "PR desde un repo externo ($HEAD_REPO) — no se construye en este runner" >&2
             exit 1
@@ -120,6 +138,9 @@ jobs:
             [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
             *) echo "head.sha ausente o con forma inesperada: '$HEAD_SHA'" >&2; exit 1 ;;
           esac
+
+          # Los pasos posteriores necesitan el contexto resuelto del push.
+          printf 'HEAD_SHA=%s\nHEAD_REF=%s\n' "$HEAD_SHA" "$HEAD_REF" >> "$GITHUB_ENV"
 
           UNITCHECK_DIR="$(cd "$GITHUB_WORKSPACE/.." && pwd)/unitcheck-$HEAD_SHA"
           mkdir -p "$UNITCHECK_DIR"
@@ -170,7 +191,7 @@ jobs:
             -w /workspace \
             -e CI=1 \
             "$IMG" \
-            sh -c 'apt-get update -qq && apt-get install -y -qq --no-install-recommends libarchive-tools >/dev/null && corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm exec vitest run apps/pwa packages apps/landing --exclude "**/ltv-validation/tests/property.test.ts"')
+            sh -c 'apt-get update -qq && apt-get install -y -qq --no-install-recommends libarchive-tools >/dev/null && corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @firma-ec/stats-backend prisma:generate && pnpm --filter @firma-ec/stats-backend test && pnpm exec vitest run apps/pwa packages apps/landing --exclude "**/ltv-validation/tests/property.test.ts"')
 
           # Streaming en vivo: sin esto el job es una caja negra hasta el final.
           docker logs -f "$CID" 2>&1 &

@@ -49,8 +49,13 @@
 
   # PWA route redirects — landing has no /firmar /verificar /paranoia routes;
   # they live in app.firmar.ec (hash-routed PWA). Added v0.1.4 (2026-05-09).
-  redir /firmar https://app.firmar.ec/#/firmar permanent
-  redir /firmar/* https://app.firmar.ec/#/firmar permanent
+  # Preserve the query before the hash, including encoded/repeated parameters.
+  map {query} {pwa_query} {
+    "" ""
+    default "?{query}"
+  }
+  redir /firmar https://app.firmar.ec/{pwa_query}#/firmar permanent
+  redir /firmar/* https://app.firmar.ec/{pwa_query}#/firmar permanent
   redir /verificar https://app.firmar.ec/#/verificar permanent
   redir /verificar/* https://app.firmar.ec/#/verificar permanent
   redir /paranoia https://app.firmar.ec/#/paranoia permanent
@@ -61,8 +66,8 @@
   # a la PWA, igual que /firmar /verificar en ES. Faltaban → 404 en los 2 CTA
   # principales de la versión inglesa (2 errores 404 en GSC). Espejo del bloque ES.
   # Added v0.1.27 (2026-05-25).
-  redir /en/sign https://app.firmar.ec/#/firmar permanent
-  redir /en/sign/* https://app.firmar.ec/#/firmar permanent
+  redir /en/sign https://app.firmar.ec/{pwa_query}#/firmar permanent
+  redir /en/sign/* https://app.firmar.ec/{pwa_query}#/firmar permanent
   redir /en/verify https://app.firmar.ec/#/verificar permanent
   redir /en/verify/* https://app.firmar.ec/#/verificar permanent
 

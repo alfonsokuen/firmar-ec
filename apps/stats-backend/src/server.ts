@@ -15,7 +15,7 @@ import healthRoutes from './routes/health.js';
 import statsRoutes from './routes/stats.js';
 
 export interface BuildServerOpts {
-  /** Disable global ip rate limiter (per-route limits keep working). */
+  /** Test only: skip the HTTP limiter plugin (Redis accounting limits remain). */
   disableRateLimit?: boolean;
   /** Override env (test only). */
   env?: Env;

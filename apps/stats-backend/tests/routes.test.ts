@@ -42,6 +42,8 @@ function mockPrisma() {
 let app: FastifyInstance;
 
 beforeEach(async () => {
+  // ioredis-mock comparte almacenamiento entre instancias del mismo host/puerto.
+  await new RedisMock().flushall();
   app = await buildServer({
     disableRateLimit: true,
     overrides: { prisma: mockPrisma(), redis: new RedisMock() as never },
@@ -93,12 +95,12 @@ describe('GET /api/stats/series — validation', () => {
       granularity: string;
       since: string;
       buckets: Array<{ period: string; sign: number; verify: number; cert: number }>;
-      totals: { sign: number; verify: number; cert: number };
+      totals: { sign: number; verify: number; cert: number; lote: number };
     };
     expect(body.granularity).toBe('day');
     expect(typeof body.since).toBe('string');
     expect(body.buckets).toHaveLength(30);
-    expect(body.totals).toEqual({ sign: 5, verify: 3, cert: 1 });
+    expect(body.totals).toEqual({ sign: 5, verify: 3, cert: 1, lote: 0 });
     expect(res.headers['cache-control']).toBe('public, max-age=300');
   });
 });
@@ -113,6 +115,113 @@ describe('POST /api/stats/event — validation', () => {
   test('valid type via query → 204', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/stats/event?type=sign' });
     expect(res.statusCode).toBe(204);
+  });
+
+  // 2026-09-10 — 'lote' es el quinto tipo de evento (medir el uso real de la
+  // firma por lotes, hoy invisible: FirmarLote.svelte nunca llamaba pingUsage).
+  test('lote is a valid type → 204', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/stats/event?type=lote' });
+    expect(res.statusCode).toBe(204);
+  });
+});
+
+/**
+ * El limitador ahora valida el `type` con el enum de zod ANTES de tocar
+ * Redis: un tipo inventado no puede mintar una clave `rl:stats:<ip>:<type>`
+ * arbitraria. Este test va sobre la ruta real (Redis real vía ioredis-mock,
+ * sin overridear `.eval`) y mira las claves que de verdad quedaron escritas.
+ */
+describe('el rate-limit key nunca se crea para un type invalido', () => {
+  test('un type inventado no deja ninguna clave rl:stats:* en Redis', async () => {
+    const redis = new RedisMock();
+    const localApp = await buildServer({
+      disableRateLimit: true,
+      overrides: { prisma: mockPrisma(), redis: redis as never },
+    });
+    try {
+      const res = await localApp.inject({
+        method: 'POST',
+        url: '/api/stats/event?type=bogus',
+      });
+      expect(res.statusCode).toBe(422);
+      const keys = await (redis as unknown as { keys: (p: string) => Promise<string[]> }).keys(
+        'rl:stats:*',
+      );
+      expect(keys).toEqual([]);
+    } finally {
+      await localApp.close();
+    }
+  });
+});
+
+/**
+ * El cubo del limitador era UN SOLO bucket global (`rl:stats:<ip>`) para
+ * TODOS los tipos de evento: un pico de `lote` podía vaciarlo y silenciar
+ * `sign` con nadie enterándose. Ahora es un bucket por tipo
+ * (`rl:stats:<ip>:<type>`). Se afirman las DOS direcciones: agotar `lote` no
+ * toca `sign`, y agotar `sign` no toca `lote`.
+ */
+describe('el limitador aisla por tipo (rl:stats:<ip>:<type>)', () => {
+  test('agotar el cubo de lote no descarta un sign posterior', async () => {
+    const prisma = mockPrisma();
+    let escrituras = 0;
+    const originalExecuteRaw = prisma.$executeRaw;
+    prisma.$executeRaw = async (...args: Parameters<typeof originalExecuteRaw>) => {
+      escrituras++;
+      return originalExecuteRaw(...args);
+    };
+    const localApp = await buildServer({
+      disableRateLimit: true,
+      overrides: { prisma, redis: new RedisMock() as never },
+    });
+    try {
+      // Vaciar el cubo de 'lote' (20 tokens).
+      for (let i = 0; i < 20; i++) {
+        const r = await localApp.inject({ method: 'POST', url: '/api/stats/event?type=lote' });
+        expect(r.statusCode).toBe(204);
+      }
+      // El 21º 'lote' se descarta (204 al cliente, pero sin escritura).
+      const overLote = await localApp.inject({
+        method: 'POST',
+        url: '/api/stats/event?type=lote',
+      });
+      expect(overLote.statusCode).toBe(204);
+      const escriturasTrasLote = escrituras;
+
+      // Un 'sign' inmediatamente después SÍ debe contar: cubo independiente.
+      const sign = await localApp.inject({ method: 'POST', url: '/api/stats/event?type=sign' });
+      expect(sign.statusCode).toBe(204);
+      // 2 escrituras nuevas: el contador y la fila de la serie.
+      expect(escrituras).toBe(escriturasTrasLote + 2);
+    } finally {
+      await localApp.close();
+    }
+  });
+
+  test('agotar el cubo de sign no descarta un lote posterior', async () => {
+    const prisma = mockPrisma();
+    let escrituras = 0;
+    const originalExecuteRaw = prisma.$executeRaw;
+    prisma.$executeRaw = async (...args: Parameters<typeof originalExecuteRaw>) => {
+      escrituras++;
+      return originalExecuteRaw(...args);
+    };
+    const localApp = await buildServer({
+      disableRateLimit: true,
+      overrides: { prisma, redis: new RedisMock() as never },
+    });
+    try {
+      for (let i = 0; i < 21; i++) {
+        await localApp.inject({ method: 'POST', url: '/api/stats/event?type=sign' });
+      }
+      const escriturasTrasSign = escrituras;
+
+      const lote = await localApp.inject({ method: 'POST', url: '/api/stats/event?type=lote' });
+      expect(lote.statusCode).toBe(204);
+      expect(escrituras).toBe(escriturasTrasSign + 2);
+    } finally {
+      await localApp.close();
+    }
   });
 });
 

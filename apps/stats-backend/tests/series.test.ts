@@ -127,16 +127,29 @@ describe('boundary wrap (the off-by-one class this code is most exposed to)', ()
 
 describe('combined storage codec', () => {
   test('parseCounts is tolerant of null and garbage', () => {
-    expect(parseCounts(null)).toEqual({ sign: 0, verify: 0, cert: 0, install: 0 });
-    expect(parseCounts('not json')).toEqual({ sign: 0, verify: 0, cert: 0, install: 0 });
-    expect(parseCounts('{"s":3,"v":1,"c":2,"i":4}')).toEqual({
+    expect(parseCounts(null)).toEqual({ sign: 0, verify: 0, cert: 0, install: 0, lote: 0 });
+    expect(parseCounts('not json')).toEqual({
+      sign: 0,
+      verify: 0,
+      cert: 0,
+      install: 0,
+      lote: 0,
+    });
+    expect(parseCounts('{"s":3,"v":1,"c":2,"i":4,"l":5}')).toEqual({
       sign: 3,
       verify: 1,
       cert: 2,
       install: 4,
+      lote: 5,
     });
     // negatives clamp to 0, floats floor, missing fields → 0
-    expect(parseCounts('{"s":-5,"v":1.9}')).toEqual({ sign: 0, verify: 1, cert: 0, install: 0 });
+    expect(parseCounts('{"s":-5,"v":1.9}')).toEqual({
+      sign: 0,
+      verify: 1,
+      cert: 0,
+      install: 0,
+      lote: 0,
+    });
   });
   // 2026-08-24 — `install` (`i`) se añadió después de que ya hubiera series
   // guardadas. Este test fija la promesa del comentario de parseCounts: los
@@ -147,16 +160,31 @@ describe('combined storage codec', () => {
       verify: 5,
       cert: 1,
       install: 0,
+      lote: 0,
+    });
+  });
+  // 2026-09-10 — mismo caso para `lote` (`l`), el quinto campo.
+  test('parseCounts reads pre-lote values written before the `l` field existed', () => {
+    expect(parseCounts('{"s":12,"v":5,"c":1,"i":2}')).toEqual({
+      sign: 12,
+      verify: 5,
+      cert: 1,
+      install: 2,
+      lote: 0,
     });
   });
   test('serialize/parse round-trips', () => {
-    const c = { sign: 7, verify: 4, cert: 2, install: 3 };
+    const c = { sign: 7, verify: 4, cert: 2, install: 3, lote: 6 };
     expect(parseCounts(serializeCounts(c))).toEqual(c);
   });
   test('bumpCount increments one type immutably', () => {
-    const a = { sign: 1, verify: 2, cert: 3 };
-    expect(bumpCount(a, 'verify')).toEqual({ sign: 1, verify: 3, cert: 3 });
-    expect(a).toEqual({ sign: 1, verify: 2, cert: 3 }); // original untouched
+    const a = { sign: 1, verify: 2, cert: 3, install: 0, lote: 0 };
+    expect(bumpCount(a, 'verify')).toEqual({ sign: 1, verify: 3, cert: 3, install: 0, lote: 0 });
+    expect(a).toEqual({ sign: 1, verify: 2, cert: 3, install: 0, lote: 0 }); // original untouched
+  });
+  test('bumpCount increments lote immutably', () => {
+    const a = { sign: 1, verify: 2, cert: 3, install: 0, lote: 4 };
+    expect(bumpCount(a, 'lote')).toEqual({ sign: 1, verify: 2, cert: 3, install: 0, lote: 5 });
   });
 });
 

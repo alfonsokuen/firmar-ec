@@ -33,8 +33,9 @@ import {
  * 30 documentos no salieron. Aquí lo sabe antes de decidir nada.
  *
  * Privacidad (invariante del proyecto): ni el nombre de un documento ni el PIN
- * ni la cédula del firmante salen de esta pantalla. No hay telemetría, no hay
- * logs con datos del usuario, y el PIN se borra en cuanto deja de hacer falta.
+ * ni la cédula del firmante salen de esta pantalla. Solo se cuenta el tipo de
+ * evento anónimo al completar un lote con alguna firma. No hay logs con datos
+ * del usuario, y el PIN se borra en cuanto deja de hacer falta.
  */
 import type { SignatureScan } from '../lib/batch/signatureScan.ts';
 import {
@@ -47,6 +48,7 @@ import {
 } from '../lib/export/batchZip';
 import { type UIKey, getLang, t, tp } from '../lib/i18n.svelte.ts';
 import { getSettings } from '../lib/settings.svelte.ts';
+import { pingUsage } from '../lib/statsBeacon';
 import { holdReload, releaseReload } from '../lib/swUpdate.svelte.ts';
 import { type BatchQueueItem, MAX_BATCH_FILE_SIZE_BYTES } from '../lib/workers/sign-queue';
 import BoxPlacer from '../ui/firma/BoxPlacer.svelte';
@@ -773,6 +775,8 @@ async function startSigning(): Promise<void> {
       },
     });
 
+    // Una corrida con al menos un PDF firmado; nunca un evento por documento.
+    if (res.batch.succeeded > 0) pingUsage('lote');
     result = res;
     zipUrl = URL.createObjectURL(res.zip);
     // QA post-merge 2026-08-03 (silent-failure-hunter): el motor conserva a
