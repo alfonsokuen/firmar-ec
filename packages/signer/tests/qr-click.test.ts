@@ -13,6 +13,10 @@ import { buildVerifyQrUrl } from '../src/verifyUrl.js';
 
 let pfx: Awaited<ReturnType<typeof parsePfx>>;
 const offline = { timestamp: false, ltv: { enabled: false }, aiaFallback: null } as const;
+// Two real signatures + PDF.js + cryptographic verification take ~7.8s in
+// the CI container (4 CPUs), versus ~1.6s locally. Keep every assertion;
+// give this integration path its own budget, not a global timeout increase.
+const MULTISIGN_INTEGRATION_TIMEOUT_MS = 20_000;
 beforeAll(async () => {
   pkijs.setEngine(
     'node-webcrypto',
@@ -78,23 +82,32 @@ describe('QR links in the signed PDF as read by PDF.js', () => {
       expect(verified.integrity?.digestMatches).toBe(true);
     });
 
-    it(`incremental signature preserves previous bytes and QR, rotation ${c.rotate}`, async () => {
-      const input = await source(c.rotate, true);
-      const { signedPdf: first } = await signPdfPades(input, pfx, {
-        ...offline,
-        visibleSig: { ...placement, x: 300 },
-      });
-      const next = await addIncrementalSignature(first, pfx, { ...offline, visibleSig: placement });
-      expect(Buffer.from(next.subarray(0, first.length)).equals(Buffer.from(first))).toBe(true);
-      const annots = await annotations(next, 2);
-      const links = annots.filter((a) => a.subtype === 'Link');
-      expect(links).toHaveLength(2);
-      expect(links.map((a) => a.url)).toEqual([expectedUrl(input), expectedUrl(first)]);
-      expect(links[1].rect).toEqual(c.next);
-      expect(annots.filter((a) => a.subtype === 'Widget' && a.fieldType === 'Sig')).toHaveLength(2);
-      const verified = await verifyPdf(next, { trustRoots: [], fetchOcsp: false });
-      expect(verified.integrity?.digestMatches).toBe(true);
-    });
+    it(
+      `incremental signature preserves previous bytes and QR, rotation ${c.rotate}`,
+      async () => {
+        const input = await source(c.rotate, true);
+        const { signedPdf: first } = await signPdfPades(input, pfx, {
+          ...offline,
+          visibleSig: { ...placement, x: 300 },
+        });
+        const next = await addIncrementalSignature(first, pfx, {
+          ...offline,
+          visibleSig: placement,
+        });
+        expect(Buffer.from(next.subarray(0, first.length)).equals(Buffer.from(first))).toBe(true);
+        const annots = await annotations(next, 2);
+        const links = annots.filter((a) => a.subtype === 'Link');
+        expect(links).toHaveLength(2);
+        expect(links.map((a) => a.url)).toEqual([expectedUrl(input), expectedUrl(first)]);
+        expect(links[1].rect).toEqual(c.next);
+        expect(annots.filter((a) => a.subtype === 'Widget' && a.fieldType === 'Sig')).toHaveLength(
+          2,
+        );
+        const verified = await verifyPdf(next, { trustRoots: [], fetchOcsp: false });
+        expect(verified.integrity?.digestMatches).toBe(true);
+      },
+      MULTISIGN_INTEGRATION_TIMEOUT_MS,
+    );
   }
 
   it('invisible signatures do not add a clickable area', async () => {

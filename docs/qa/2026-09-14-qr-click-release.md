@@ -25,3 +25,8 @@ PWA_E2E_BASE_URL=http://127.0.0.1:5187 pnpm --filter @firma-ec/pwa test:e2e:live
 ```
 
 Postdespliegue: repetir test:e2e:live-signing contra app.firmar.ec, comprobar versión 0.27.0 y convergencia al SHA publicado. Si hay fallo funcional atribuible a esta release, volver a la imagen inmutable previa comprobada. Los PDF ya emitidos no se modifican.
+
+## Verificación pública y ajuste del gate Linux
+
+- Primer despliegue: b5bb38a3296b, Gitea run 2927 correcto, 2/2 réplicas. E2E público 8/8, versión 0.27.0 comprobada en sesión nueva, home 200 y 404 de assets con no-store.
+- El gate Linux (run 2928) completó 1.411 pruebas y agotó el límite por defecto de 5s en las cuatro pruebas QR de multifirma (~7.8s en el contenedor con 4 CPU). Se asigna un presupuesto de 20s solo a esas pruebas de integración; sin reintentos, exclusiones ni cambios en las aserciones. La aplicación publicada no cambia.

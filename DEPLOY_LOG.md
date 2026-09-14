@@ -1,5 +1,14 @@
 # firma-ec — Deploy Log
 
+## PWA 0.27.0 — 2026-09-14
+
+- Imagen inicial: firma-ec-pwa:sha-b5bb38a3296b. Pipeline Gitea 2927 correcto; PWA 2/2 réplicas, rollout completed.
+- QR pulsable en PDF nuevos (firma única y multifirma): abre el verificador y solicita el PDF recibido. Verificación local.
+- E2E público: 8/8 en escritorio y móvil (firma, PIN incorrecto, ZIP, segunda firma y clic real en PDF.js). La sesión nueva muestra 0.27.0.
+- Backup privado de especificaciones y antigua imagen inmutable conservados en el manager. Sin migraciones.
+- Ajuste posterior exclusivamente de pruebas: presupuesto de multifirma para el contenedor Linux, ver docs/qa/2026-09-14-qr-click-release.md.
+
+
 Curated record of production deploys to `app.firmar.ec` (PWA) and `firmar.ec` (landing). Registry: `<REGISTRY>` (IDK Swarm). For narrative detail see [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## Hotfixes (post-F7)
