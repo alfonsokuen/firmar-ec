@@ -20,3 +20,5 @@ test.beforeEach(async ({ context, baseURL }) => {
 // real signing, wrong PIN and ZIP only; no TSA/revocation/issuance claims.
 import './firma.spec';
 import './firmar-lote.spec';
+
+import './qr-verification.spec';
