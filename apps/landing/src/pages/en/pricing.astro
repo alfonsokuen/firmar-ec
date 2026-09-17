@@ -16,6 +16,7 @@ const articleProps = {
   ...(data.dateModified !== undefined ? { dateModified: data.dateModified } : {}),
   breadcrumbs: data.breadcrumbs,
   related: data.related,
+  faq: data.faq,
 };
 ---
 <ArticleSeo {...articleProps}>
