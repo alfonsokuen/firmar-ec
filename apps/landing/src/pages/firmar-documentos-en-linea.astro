@@ -1,77 +1,25 @@
 ---
 import { getEntry, render } from 'astro:content';
 import ArticleSeo from '../layouts/ArticleSeo.astro';
-import { faqPage, howTo } from '../lib/jsonld.ts';
+import { howTo } from '../lib/jsonld.ts';
 
 const entry = await getEntry('pages', 'es/firmar-documentos-en-linea');
 if (!entry) throw new Error('Missing content/pages/es/firmar-documentos-en-linea.md');
 const { Content } = await render(entry);
 const data = entry.data;
 
+// Mirrors the visible numbered procedure; no unmeasured completion time.
 const howToData = howTo({
   name: data.h1 ?? data.title,
   description: data.description,
-  totalTime: 'PT2M',
   steps: [
-    {
-      name: 'Abre la app',
-      text: 'Visita app.firmar.ec en tu navegador, desde computadora o móvil.',
-      url: 'https://app.firmar.ec/',
-    },
-    {
-      name: 'Carga el documento PDF',
-      text: 'Arrastra o selecciona el documento que quieres firmar; nunca sale de tu equipo.',
-    },
-    {
-      name: 'Carga tu certificado .p12 y firma',
-      text: 'Ingresa la contraseña, coloca el sello visible y confirma. La firma PAdES se calcula en tu navegador.',
-    },
-    {
-      name: 'Descarga el PDF firmado',
-      text: 'El documento queda firmado con PAdES (ETSI EN 319 142), válido ante SRI, banca e instituciones públicas.',
-    },
+    { name: 'Abre la app', text: 'Visita app.firmar.ec/firmar en tu navegador.', url: 'https://app.firmar.ec/firmar' },
+    { name: 'Selecciona el PDF y coloca la firma visible', text: 'Elige la página y la posición del cuadro de firma.' },
+    { name: 'Selecciona tu certificado', text: 'Carga el archivo .p12 o .pfx del titular que debe firmar.' },
+    { name: 'Comprueba la contraseña y firma', text: 'Introduce la contraseña del archivo, revisa el titular y el resumen, y pulsa Firmar PDF.' },
+    { name: 'Descarga y verifica', text: 'Guarda el PDF firmado y comprueba su firma antes de entregarlo.' },
   ],
 });
-
-// Answers mirror the page body verbatim (the opening blockquote and the FAQ
-// entries taken from src/content/faq/*.md) so the JSON-LD never claims
-// anything the visible text does not already say. La pregunta-ancla es la
-// genérica «cómo se firma en Ecuador»: la consulta «gratis / sin instalar»
-// la responde /firmar-pdf-online-gratis-sin-instalar-programas/, y dos
-// páginas emitiendo la MISMA Question con respuestas distintas se
-// canibalizan.
-const faqData = faqPage([
-  {
-    question: '¿Cómo se firma electrónicamente un documento en Ecuador?',
-    answer:
-      'Con un certificado de firma electrónica en archivo .p12, emitido por una ECI acreditada por ARCOTEL (BCE, Security Data, Uanataca, Consejo de la Judicatura, ArgosData y demás). Cargas el documento y el certificado en un firmador, ingresas la contraseña y obtienes un PDF con una firma PAdES (ETSI EN 319 142), que el artículo 14 de la Ley de Comercio Electrónico equipara a la firma manuscrita y que aceptan el SRI, la banca y las instituciones públicas. En firmar.ec ese firmador es una página web y la firma se calcula dentro de tu propio navegador.',
-  },
-  {
-    question: '¿Cuánto cuesta?',
-    answer:
-      'Cero. firmar.ec es un proyecto open-source sin fines de lucro de IDK Manager. No hay plan premium, no hay suscripción, no hay límite de firmas. Tampoco hay publicidad ni telemetría: el costo de mantenimiento lo asume IDK Manager como contribución al ecosistema digital ecuatoriano.',
-  },
-  {
-    question: '¿Mi llave privada (.p12) llega al servidor?',
-    answer:
-      'No. La firma sucede 100% en tu navegador. El archivo .p12 y la contraseña se procesan dentro de un Web Worker dedicado, la llave privada se importa al Web Crypto API como CryptoKey extractable:false, y los buffers se sobrescriben con ceros al terminar.',
-  },
-  {
-    question: '¿Qué tipos de archivo puedo firmar?',
-    answer:
-      'En esta versión, solo PDFs. Soporte de XAdES (XML para SRI) y CAdES (firma detached para cualquier archivo) está en el roadmap pero no en v1. Si necesitas firmar comprobantes electrónicos del SRI hoy, tu mejor opción sigue siendo el flujo nativo en tu sistema contable.',
-  },
-  {
-    question: '¿La firma tiene validez legal en Ecuador?',
-    answer:
-      'Sí, siempre que tu certificado haya sido emitido por una Entidad de Certificación de Información (ECI) acreditada por ARCOTEL: BCE, Consejo de la Judicatura (iCert-EC), Security Data, ANFAC, ArgosData, Uanataca, Eclipse Soft, Datil. Estas firmas son firma electrónica avanzada (FEA) según la Ley de Comercio Electrónico, Firmas Electrónicas y Mensajes de Datos (Ley 2002-67) y tienen los mismos efectos jurídicos que una firma manuscrita (art. 14).',
-  },
-  {
-    question: '¿Es compatible con FirmaEC del MINTEL?',
-    answer:
-      'Sí. Los PDFs firmados por firmar.ec usan el perfil PAdES Baseline B-B (ETSI EN 319 142-1), el mismo que produce FirmaEC desktop. Pueden validarse en FirmaEC, Adobe Reader, validador del MINTEL Minka, validador del SRI y cualquier otro verificador PAdES estándar.',
-  },
-]);
 
 const articleProps = {
   title: data.title,
@@ -82,10 +30,10 @@ const articleProps = {
   ...(data.dateModified !== undefined ? { dateModified: data.dateModified } : {}),
   breadcrumbs: data.breadcrumbs,
   related: data.related,
+  faq: data.faq,
 };
 ---
 <ArticleSeo {...articleProps}>
   <Content />
   <script type="application/ld+json" set:html={JSON.stringify(howToData)}></script>
-  <script type="application/ld+json" set:html={JSON.stringify(faqData)}></script>
 </ArticleSeo>
