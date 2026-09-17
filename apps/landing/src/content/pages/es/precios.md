@@ -3,7 +3,7 @@ title: "¿Cuánto cuesta la firma electrónica en Ecuador? Precios 2026"
 description: "Compara precios publicados de certificados de firma electrónica en Ecuador: archivo .p12, vigencia e IVA. Distingue el certificado de la herramienta para firmar."
 lang: es
 datePublished: "2026-05-29"
-dateModified: "2026-09-16"
+dateModified: "2026-09-17"
 h1: "¿Cuánto cuesta una firma electrónica en Ecuador?"
 breadcrumbs:
   - { name: "Precios de firma electrónica", url: "https://firmar.ec/precios/" }
@@ -34,13 +34,13 @@ La tabla compara la modalidad **archivo `.p12`**. Las vigencias son distintas: r
 | Proveedor y fuente | Vigencia | Precio con IVA |
 |---|---|---|
 | [ICERT-EC · Consejo de la Judicatura](https://www.icert.fje.gob.ec/tarifas-certificados/) | 2 años | **USD 27,60** |
-| [Uanataca · Namirial, en nuestra tienda](https://tienda.firmar.ec/precios) | 1 año | **USD 23,60** |
-| [Uanataca · Namirial, en nuestra tienda](https://tienda.firmar.ec/precios) | 2 años | **USD 35,90** |
+| [Uanataca · Namirial, en nuestra tienda](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=precios-tabla) | 1 año | **USD 23,60** |
+| [Uanataca · Namirial, en nuestra tienda](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=precios-tabla) | 2 años | **USD 35,90** |
 | [Security Data · cotizador oficial](https://www.securitydata.net.ec/firma-electronica-en-ecuador/) | Según opción | **Consultar** |
 
 **Fecha de consulta: 16 de septiembre de 2026.** Las tarifas y promociones pueden cambiar. Verifica el importe final y la modalidad en el canal del proveedor antes de pagar. Para Security Data, su página indica «Todos los precios incluyen IVA»; consulta el valor que corresponda al perfil y la vigencia seleccionados.
 
-**Transparencia comercial:** tienda.firmar.ec forma parte de nuestro servicio y comercializa certificados de Uanataca · Namirial. Esta selección no cubre todo el mercado ni establece cuál es el proveedor más barato. Puedes consultar otros emisores en la [comparativa de entidades de certificación](/comparativa-emisores-ecuador/).
+**Transparencia comercial:** [tienda.firmar.ec](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=precios-disclaimer) forma parte de nuestro servicio y comercializa certificados de Uanataca · Namirial. Esta selección no cubre todo el mercado ni establece cuál es el proveedor más barato. Puedes consultar otros emisores en la [comparativa de entidades de certificación](/comparativa-emisores-ecuador/).
 
 ## ¿Cómo comparar dos ofertas de firma electrónica?
 
@@ -66,6 +66,6 @@ La firma de PDFs en [app.firmar.ec](https://app.firmar.ec/firmar) es gratuita. P
 
 ## ¿Cómo empiezo?
 
-Si aún no tienes certificado, revisa [cómo obtener una firma electrónica](/como-obtener-certificado-firma-electronica/) y confirma el precio en el canal del emisor que elijas. Cuando recibas tu archivo y su contraseña, sigue la guía de [firmar documentos en línea](/firmar-documentos-en-linea/).
+Si aún no tienes certificado, revisa [cómo obtener una firma electrónica](/como-obtener-certificado-firma-electronica/) y confirma el precio en el canal del emisor que elijas. Puedes consultar el certificado de Uanataca · Namirial en [nuestra tienda](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=precios-faq). Cuando recibas tu archivo y su contraseña, sigue la guía de [firmar documentos en línea](/firmar-documentos-en-linea/).
 
 [Ya tengo un certificado: firmar un PDF →](https://app.firmar.ec/firmar)

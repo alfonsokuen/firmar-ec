@@ -3,7 +3,7 @@ title: "ARCOTEL-Accredited Certificate Issuers (ECIs) in Ecuador — 2026 Compar
 description: "Updated list of all Certificate Information Entities (ECI) accredited by ARCOTEL in Ecuador. Comparison of certificate types, validity, support, reference pricing and official links. Updated 2026."
 lang: en
 datePublished: "2026-05-29"
-dateModified: "2026-08-24"
+dateModified: "2026-09-17"
 h1: "Certificate Information Entities (ECI) Accredited by ARCOTEL — Ecuador 2026"
 breadcrumbs:
   - { name: "ECI Ecuador 2026 comparison", url: "https://firmar.ec/en/certificate-issuers-ecuador/" }
@@ -33,7 +33,7 @@ This matters when signing:
 | ECI | Type | Available formats | Typical validity | Reference price (natural person) | Official site |
 |---|---|---|---|---|---|
 | **Banco Central del Ecuador (BCE)** | Public | `.p12` file, USB token | 2 years | ~USD 28 + VAT | [eci.bce.ec](https://www.eci.bce.ec) |
-| **Consejo de la Judicatura — ICERT-EC** | Public | `.p12` file, USB token | 2 years | ~USD 19.80 + VAT *(official rate)* | [icert.fje.gob.ec](https://www.icert.fje.gob.ec) |
+| **Consejo de la Judicatura — ICERT-EC** | Public | `.p12` file; token priced separately | 2 years | **USD 27.60 including VAT, file** | [Official ICERT-EC price](https://www.icert.fje.gob.ec/tarifas-certificados/) |
 | **Registro Civil ECI** | Public | `.p12`, token, mobile | 2 years | ~USD 30 + VAT | [registrocivil.gob.ec](https://www.registrocivil.gob.ec) |
 | **Security Data S.A.** | Private | `.p12`, token, cloud, HSM | 1-3 years | ~USD 28–60 + VAT | [securitydata.net.ec](https://www.securitydata.net.ec) |
 | **UANATACA Ecuador** | Private | `.p12`, cloud, eIDAS | 1-3 years | ~USD 20–50 + VAT | [uanataca.com](https://web.uanataca.com) |
@@ -46,7 +46,7 @@ This matters when signing:
 | **Lazzate** | Private | `.p12`, cloud | 1-2 years | Inquire | [lazzate.com](https://lazzate.com) |
 | **LETMI / CORPNEWBEST / Alpha Technologies / DARKCAM / Prime Core / WE-GO** | Private | `.p12` | 1-2 years | Inquire | ARCOTEL registry |
 
-> **Reference prices, not quotes.** Each ECI publishes its tariffs on its site. ICERT-EC publishes an official rate; the rest vary by plan and validity. Always check with the ECI before paying.
+> **Reference prices, not quotes.** ICERT-EC's file certificate price was checked on 16 September 2026 and includes VAT. The other ranges in this table are earlier references that you should confirm with each provider. See [certificate prices](/en/pricing/) for figures with sources and dates. firmar.ec also sells Uanataca · Namirial certificates in its store, as explained below.
 
 ## How to choose your ECI
 
@@ -55,7 +55,7 @@ This matters when signing:
 - **Sign from mobile / web**: any ECI that issues `.p12` directly (Security Data, UANATACA, ANF AC, ArgosData, Eclipsoft, Datil).
 - **Cloud signature** (no `.p12` file to manage): UANATACA, ANF AC, Lazzate.
 - **Get it fastest**: ECIs with remote video identification (ArgosData, UANATACA, Datil, ANF AC) — issuance in 24–72 business hours.
-- **Lowest verifiable price**: ICERT-EC (USD 19.80 + VAT, official rate).
+- **Compare published prices**: ICERT-EC lists **USD 27.60 including VAT for two years** for its `.p12` file certificate, checked on 16 September 2026. Compare the same format, validity period and tax basis; this figure alone does not establish which provider is cheapest. See [prices with sources](/en/pricing/).
 
 ### If you would rather buy it here
 
@@ -63,8 +63,8 @@ This comparison is independent and reorders nothing out of self-interest, but it
 worth saying plainly: we also sell certificates. At
 [tienda.firmar.ec](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=issuers-en) we issue
 UANATACA · Namirial `.p12` certificates fully online, and the published price
-**already includes VAT** (USD 23.60 for one year) — unlike the table above, which
-lists pre-tax rates as each ECI publishes them.
+**already includes VAT** (USD 23.60 for one year). The table above explicitly
+identifies the tax basis for each row.
 
 ## Compatibility with firmar.ec
 

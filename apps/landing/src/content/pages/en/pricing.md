@@ -3,7 +3,7 @@ title: "How much does an electronic signature cost in Ecuador? 2026"
 description: "Compare published electronic certificate prices in Ecuador by .p12 format, validity and VAT. Understand the difference between a certificate and a signing tool."
 lang: en
 datePublished: "2026-05-29"
-dateModified: "2026-09-16"
+dateModified: "2026-09-17"
 h1: "How much does an electronic signature cost in Ecuador?"
 breadcrumbs:
   - { name: "Electronic signature prices", url: "https://firmar.ec/en/pricing/" }
@@ -34,8 +34,8 @@ This table compares the **`.p12` file** format. Validity periods differ: compare
 | Provider and source | Validity | Price with VAT |
 |---|---|---|
 | [ICERT-EC · Judiciary Council](https://www.icert.fje.gob.ec/tarifas-certificados/) | 2 years | **USD 27.60** |
-| [Uanataca · Namirial, in our store](https://tienda.firmar.ec/precios) | 1 year | **USD 23.60** |
-| [Uanataca · Namirial, in our store](https://tienda.firmar.ec/precios) | 2 years | **USD 35.90** |
+| [Uanataca · Namirial, in our store](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=pricing-table-en) | 1 year | **USD 23.60** |
+| [Uanataca · Namirial, in our store](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=pricing-table-en) | 2 years | **USD 35.90** |
 | [Security Data · official price selector](https://www.securitydata.net.ec/firma-electronica-en-ecuador/) | By option | **Check price** |
 
 **Checked on 16 September 2026.** Prices and promotions may change. Confirm the final amount and storage format through the provider's channel before paying. Security Data's page states that all prices include VAT; check the amount for the selected holder profile and validity period.
@@ -66,6 +66,6 @@ Signing PDFs at [app.firmar.ec](https://app.firmar.ec/firmar) is free. You can u
 
 ## How do I get started?
 
-If you do not have a certificate, read [how to obtain an electronic certificate](/en/how-to-get-an-electronic-certificate/) and confirm the price with your chosen issuer. Once you receive your file and password, follow the [sign documents online guide](/en/sign-documents-online/).
+If you do not have a certificate, read [how to obtain an electronic certificate](/en/how-to-get-an-electronic-certificate/) and confirm the price with your chosen issuer. You can check the Uanataca · Namirial certificate in [our store](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=pricing-faq-en). Once you receive your file and password, follow the [sign documents online guide](/en/sign-documents-online/).
 
 [I already have a certificate: sign a PDF](https://app.firmar.ec/firmar)

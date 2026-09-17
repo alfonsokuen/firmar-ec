@@ -5,12 +5,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
-### Landing 0.7.7 — 2026-09-16
+### Landing 0.7.7 — 2026-09-17
 
 - Las guías de Security Data y firma de documentos responden directamente a la intención de búsqueda y describen el flujo real de firma, sin prometer tiempos ni aceptación universal.
 - Precios sustituye rangos sin fuente por tarifas publicadas con IVA, modalidad, vigencia y fecha de consulta; corrige ICERT-EC a USD 27,60 por dos años.
 - Las FAQs de estas tres páginas se renderizan y generan JSON-LD desde una sola fuente; los HowTo reflejan los pasos visibles.
 - Las tres traducciones inglesas mantienen las mismas fuentes, tarifas, límites y pasos de sus equivalentes españoles.
+- La comparativa de emisores ES/EN refleja la misma tarifa oficial de ICERT-EC; se conservan los enlaces a comparativas y la atribución UTM de la tienda.
 
 ### PWA 0.27.0 / signer 0.12.0 — 2026-09-14
 - El QR de las nuevas firmas visibles también se puede pulsar para abrir el verificador de firmar.ec. El receptor selecciona el PDF y la validación sigue siendo local. Disponible en firma única y multifirma, con la zona pulsable ajustada a la rotación de la página. El enlace se incorpora antes de firmar; los PDF ya emitidos no cambian.
