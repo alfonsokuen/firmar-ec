@@ -14,6 +14,7 @@ related:
   - { title: "How to verify a PDF signature", href: "/en/verify-pdf-signature/" }
   - { title: "Sign a PDF from your phone", href: "/en/sign-pdf-from-phone/" }
   - { title: "Electronic signatures in Ecuador: legal framework", href: "/en/electronic-signature-ecuador/" }
+  - { title: "Compare firmar.ec and FirmaEC", href: "/en/comparisons/firmaec/" }
 faq:
   - question: "How do you electronically sign a document in Ecuador?"
     answer: "To sign a PDF in firmar.ec, you need an electronic certificate as a .p12 or .pfx file and its password. Select the PDF, place the visible signature, load the certificate, review the summary and sign. Download the result and verify the signature before submitting it."

@@ -14,6 +14,7 @@ related:
   - { title: "Cómo verificar la firma de un PDF", href: "/verificar-firma-pdf/" }
   - { title: "Firmar un PDF desde el celular", href: "/firmar-pdf-desde-el-celular/" }
   - { title: "Firma electrónica en Ecuador: marco legal", href: "/firma-electronica-ecuador/" }
+  - { title: "Comparativa de firmar.ec y FirmaEC", href: "/comparativos/firmaec/" }
 faq:
   - question: "¿Cómo se firma electrónicamente un documento en Ecuador?"
     answer: "Para firmar un PDF en firmar.ec necesitas un certificado electrónico en archivo .p12 o .pfx y su contraseña. Selecciona el PDF, coloca la firma visible, carga el certificado, revisa el resumen y firma. Descarga el resultado y verifica la firma antes de entregarlo."
