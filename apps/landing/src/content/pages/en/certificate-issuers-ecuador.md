@@ -30,6 +30,8 @@ This matters when signing:
 
 ## Comparison Table — ECIs Accredited by ARCOTEL (2026)
 
+<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Certificate issuer comparison table">
+
 | ECI | Type | Available formats | Typical validity | Reference price (natural person) | Official site |
 |---|---|---|---|---|---|
 | **Banco Central del Ecuador (BCE)** | Public | `.p12` file, USB token | 2 years | ~USD 28 + VAT | [eci.bce.ec](https://www.eci.bce.ec) |
@@ -45,6 +47,8 @@ This matters when signing:
 | **FIRMASEGURA S.A.S.** | Private | `.p12`, token | 1-2 years | Inquire | [firmasegura.ec](https://firmasegura.ec) |
 | **Lazzate** | Private | `.p12`, cloud | 1-2 years | Inquire | [lazzate.com](https://lazzate.com) |
 | **LETMI / CORPNEWBEST / Alpha Technologies / DARKCAM / Prime Core / WE-GO** | Private | `.p12` | 1-2 years | Inquire | ARCOTEL registry |
+
+</div>
 
 > **Reference prices, not quotes.** ICERT-EC's file certificate price was checked on 16 September 2026 and includes VAT. The other ranges in this table are earlier references that you should confirm with each provider. See [certificate prices](/en/pricing/) for figures with sources and dates. firmar.ec also sells Uanataca · Namirial certificates in its store, as explained below.
 

@@ -32,6 +32,8 @@ Esto importa cuando firmas:
 
 ## Tabla comparativa — ECIs acreditadas por ARCOTEL (2026)
 
+<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Tabla comparativa de emisores de certificados">
+
 | ECI | Tipo | Formatos disponibles | Vigencia común | Precio referencial persona natural | Sitio oficial |
 |---|---|---|---|---|---|
 | **Banco Central del Ecuador (BCE)** — `eci.bce.ec` | Pública | Archivo `.p12`, token USB | 2 años | ~USD 28 + IVA | [eci.bce.ec](https://www.eci.bce.ec) |
@@ -52,6 +54,8 @@ Esto importa cuando firmas:
 | **DARKCAM S.A.** | Privada | Archivo `.p12` | 1-2 años | Consultar | Buscar en ARCOTEL |
 | **Prime Core** | Privada | Archivo `.p12` | 1-2 años | Consultar | Buscar en ARCOTEL |
 | **WE-GO TERCER VINCULADO** | Privada | Archivo `.p12` | 1-2 años | Consultar | Buscar en ARCOTEL |
+
+</div>
 
 > **Precios referenciales, no vinculantes.** La tarifa de ICERT-EC en archivo se consultó el 16 de septiembre de 2026 e incluye IVA. Los demás rangos de esta tabla son referencias anteriores que debes confirmar con cada proveedor. Para comparar cifras con fuente y fecha, consulta [precios de certificados](/precios/). firmar.ec también comercializa certificados de Uanataca · Namirial en su tienda, como se explica más abajo.
 
