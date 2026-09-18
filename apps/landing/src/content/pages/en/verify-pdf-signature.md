@@ -2,6 +2,7 @@
 title: "How to verify a PDF signature in Ecuador"
 description: "Check whether a signed PDF is valid: document integrity, a certificate from an ARCOTEL-accredited ECI, and revocation status. In your browser, with no install."
 lang: en
+dateModified: "2026-09-18"
 datePublished: "2026-05-25"
 h1: "How to verify the electronic signature of a PDF"
 breadcrumbs:
@@ -49,3 +50,7 @@ You can also verify a PAdES signature in **Adobe Acrobat Reader** (signature pan
 **Does verification work offline?** The integrity check and the certificate chain do; real-time revocation checks (OCSP) require a connection.
 
 **I received a PDF and it says "invalid signature" — what should I do?** This usually means the document was edited after signing, or the certificate was expired/revoked at signing time. Ask the sender to re-sign the final document.
+
+## Interpreting results
+
+See the [PDF signature verification methodology](/en/verification-methodology/): integrity, trust, revocation and time are separate checks. It includes a checklist for documenting a review and its limitations.

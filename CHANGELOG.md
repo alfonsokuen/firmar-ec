@@ -1,3 +1,9 @@
+## Landing 0.7.8 — 2026-09-18
+
+- Publish ES/EN PDF verification methodology with four evidence dimensions, a review checklist, dated source-code references and primary standards.
+- Connect the resource from verification, security, about, hreflang, sitemap and llms.txt.
+- Replace unsupported competitor/exclusivity claims and obsolete promises on About with inspectable project status.
+
 # Changelog
 
 Todos los cambios notables a este proyecto se documentan aquí.

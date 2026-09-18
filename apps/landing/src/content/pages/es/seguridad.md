@@ -2,6 +2,7 @@
 title: "Seguridad y Transparencia"
 description: "Reporte de seguridad y transparencia técnica de firmar.ec: modelo de amenazas, controles, auditorías externas, divulgación responsable."
 lang: es
+dateModified: "2026-09-18"
 datePublished: "2026-05-08"
 h1: "Seguridad y Transparencia"
 breadcrumbs:
@@ -86,3 +87,7 @@ Reconocimiento público a quienes han contribuido a mejorar la seguridad de firm
 ## Modo paranoia
 
 Para verificar tú mismo que tu llave nunca sale del navegador, sigue las instrucciones de [/paranoia](https://app.firmar.ec/paranoia) en la app.
+
+## Interpretar los resultados
+
+Consulta la [metodología de verificación de firmas PDF](/metodologia-verificacion/): integridad, confianza, revocación y tiempo son comprobaciones distintas. Incluye una lista para documentar la revisión y sus límites.

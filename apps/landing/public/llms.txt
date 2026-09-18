@@ -17,6 +17,9 @@
 - [Glosario](https://firmar.ec/glosario/): 18+ términos (ACE, CMS, ECI, PAdES, .p12, OCSP, CRL, TSA, TSL, X.509, LCE, LOPDP).
 - [Respuestas](https://firmar.ec/respuestas/): respuestas directas a preguntas concretas sobre firma electrónica en Ecuador, una por página.
 
+- [Metodología de verificación](https://firmar.ec/metodologia-verificacion/): lista técnica citable para separar integridad, cadena de confianza, revocación y evidencia temporal; límites y código público.
+- [Verification methodology (English)](https://firmar.ec/en/verification-methodology/): equivalent technical checklist in English.
+
 ## Páginas temáticas
 
 - [Firmar documentos en línea](https://firmar.ec/firmar-documentos-en-linea/): cómo se firma electrónicamente un documento, gratis, sin instalar nada; compatible con BCE, Security Data y demás ECIs.
