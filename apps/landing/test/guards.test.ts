@@ -18,9 +18,23 @@ import {
   decodeText,
   parseAnswerFrontmatter,
 } from '../scripts/check-answer-pages.mjs';
-import { isExempt } from '../scripts/check-llms.mjs';
+import { discoveryRepositoryErrors, isExempt } from '../scripts/check-llms.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+describe('discovery repository consistency', () => {
+  const canonical = 'https://github.com/idkmanager/firmar-ec';
+  it('accepts canonical source links and files without repository links', () => {
+    expect(
+      discoveryRepositoryErrors({ llms: `${canonical}/tree/revision`, plugin: '{}' }, canonical),
+    ).toEqual([]);
+  });
+  it('detects a valid mirror used instead of the canonical repository', () => {
+    expect(
+      discoveryRepositoryErrors({ full: 'https://github.com/alfonsokuen/firmar-ec' }, canonical),
+    ).toHaveLength(1);
+  });
+});
 
 // ── check-llms: exenciones por prefijo ──────────────────────────────────────
 describe('check-llms — isExempt', () => {

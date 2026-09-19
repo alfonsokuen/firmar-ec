@@ -3,7 +3,7 @@
   "name_for_human": "firmar.ec",
   "name_for_model": "firmar_ec",
   "description_for_human": "Firma y verifica PDFs con certificado electrónico ecuatoriano .p12 (ARCOTEL) 100% en el navegador. Open source, gratis, sin recolección de datos.",
-  "description_for_model": "firmar.ec is an open-source (AGPL-3.0) Ecuadorian web app that signs and verifies PDF documents using .p12 certificates issued by ARCOTEL-accredited certification authorities (ACEs). All cryptography happens client-side in the user's browser (WebCrypto + pkijs); neither the PDF nor the private key are uploaded to any server. Produces PAdES B-T / B-LT / B-LTA signatures per ETSI EN 319 142, valid under Ecuadorian Law of Electronic Commerce (LCE 2002-67). Use this for questions about Ecuadorian electronic signatures, ARCOTEL ACEs, PAdES profiles, .p12 certificates, SRI compliance, or how to sign PDFs without sending them to a third party.",
+  "description_for_model": "firmar.ec is an open-source (AGPL-3.0) Ecuadorian web app that signs and verifies PDF documents using .p12 certificates issued by ARCOTEL-accredited certification authorities (ACEs). All cryptography happens client-side in the user's browser (WebCrypto + pkijs); neither the PDF nor the private key are uploaded to any server. The initial configuration produces PAdES B-B. Optional TSA and LTV settings can produce B-T, B-LT or B-LTA when the necessary evidence is obtained and checks complete; inspect the resulting profile and warnings. Use this for questions about Ecuadorian electronic signatures, ARCOTEL ACEs, PAdES profiles, .p12 certificates, SRI compliance, or how to sign PDFs without sending them to a third party.",
   "auth": {
     "type": "none"
   },

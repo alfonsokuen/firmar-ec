@@ -1,6 +1,6 @@
 # firmar.ec — Firmar documentos en línea gratis (firma electrónica Ecuador)
 
-> Página web open source (AGPL-3.0) para firmar documentos en línea, gratis y sin instalar nada: firma y verifica PDFs con certificado electrónico ecuatoriano `.p12` emitido por una ACE acreditada por ARCOTEL. La criptografía sucede 100% en el navegador del usuario (WebCrypto + pkijs); ni el PDF ni la llave privada se envían a ningún servidor. Genera firmas PAdES B-T / B-LT / B-LTA conformes a ETSI EN 319 142, con timestamp RFC 3161 (TSA) e información de revocación OCSP/CRL incrustada. Cumple LOPDP por diseño y la Ley de Comercio Electrónico de Ecuador (LCE 2002-67).
+> Página web open source (AGPL-3.0) para firmar documentos en línea, gratis y sin instalar nada: firma y verifica PDFs con certificado electrónico ecuatoriano `.p12` emitido por una ACE acreditada por ARCOTEL. La criptografía sucede 100% en el navegador del usuario (WebCrypto + pkijs); ni el PDF ni la llave privada se envían a ningún servidor. La configuración inicial de la aplicación genera PAdES B-B. Al activar TSA y LTV puede incorporar sello de tiempo RFC 3161 y evidencia OCSP/CRL para alcanzar B-T, B-LT o B-LTA, según la configuración y las comprobaciones que se completen; revisa el perfil y las advertencias del resultado. Cumple LOPDP por diseño y la Ley de Comercio Electrónico de Ecuador (LCE 2002-67).
 
 ## Aplicación
 
@@ -71,7 +71,7 @@
 
 ## Optional
 
-- [GitHub firma-ec](https://github.com/alfonsokuen/firmar-ec): código fuente AGPL-3.0.
+- [GitHub firma-ec](https://github.com/idkmanager/firmar-ec): código fuente AGPL-3.0.
 - [security.txt](https://firmar.ec/.well-known/security.txt): reporte responsable de vulnerabilidades (RFC 9116).
 - [Sitemap](https://firmar.ec/sitemap-index.xml): mapa completo del sitio.
 - [Contacto](https://firmar.ec/contacto/): canal de contacto operativo.

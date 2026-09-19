@@ -1,3 +1,8 @@
+## Landing 0.7.9 — 2026-09-18
+
+- Align llms.txt source repository with the public IDK Manager canonical repository; both existing GitHub mirrors remain valid.
+- Clarify the default PAdES B-B profile and optional B-T/B-LT/B-LTA outcomes according to settings and completed evidence checks.
+
 ## Landing 0.7.8 — 2026-09-18
 
 - Publish ES/EN PDF verification methodology with four evidence dimensions, a review checklist, dated source-code references and primary standards.
