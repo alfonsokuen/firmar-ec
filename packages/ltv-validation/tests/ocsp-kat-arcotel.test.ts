@@ -84,6 +84,9 @@ describe('OCSP KAT — ARCOTEL ACEs (real responders)', () => {
     );
     expect(parsed.certStatus).toBe('good');
     expect(parsed.serialHex.length).toBeGreaterThan(0);
+    // The live verifier now rejects unauthenticated responses, so a real
+    // ACE response must authenticate, not merely parse.
+    expect(parsed.signatureValid, parsed.signatureDetail).toBe(true);
   });
 
   // Regression (defect this branch fixes): ArgosData's ACE responder signs

@@ -29,7 +29,9 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { parseTimestampToken } from '@firma-ec/tsa-client';
 import * as asn1js from 'asn1js';
+import * as pkijs from 'pkijs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Both mocks DEFAULT to the real implementation (the `mockImplementation`
@@ -80,6 +82,20 @@ const FIXTURE_META = resolve(
   'freetsa-kat-2026-05-09.meta.json',
 );
 const HAS_KAT = existsSync(FIXTURE_TSR) && existsSync(FIXTURE_META);
+
+// Any unrelated certificate will do: the TSA-trust bundle's UANATACA CA2 2021.
+const OTHER_CERT_PEM = readFileSync(
+  resolve(__dirname, '../../tsa-trust/src/intermediates/uanataca-ca2-2021.pem'),
+  'utf8',
+);
+
+function pemToDerLocal(pem: string): Uint8Array {
+  return Uint8Array.from(Buffer.from(pem.replace(/-----[A-Z ]+-----|\s/g, ''), 'base64'));
+}
+
+function toAbLocal(u: Uint8Array): ArrayBuffer {
+  return u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer;
+}
 
 function indexOfBytes(haystack: Uint8Array, needle: Uint8Array): number {
   outer: for (let i = 0; i + needle.length <= haystack.length; i++) {
@@ -186,12 +202,46 @@ describe('verifyTimestamp — F6 Task 12', () => {
       );
       const at = indexOfBytes(token, genTime);
       expect(at).toBeGreaterThan(-1);
+      // The edited byte must fall inside TSTInfo (the eContent), not in some
+      // other time field of the token, or the test would not exercise the
+      // message-digest binding it is about.
+      const tstInfo = parseTimestampToken(token).tstInfoDer;
+      const tstStart = indexOfBytes(token, tstInfo);
+      expect(tstStart).toBeGreaterThan(-1);
+      expect(at + 7).toBeGreaterThanOrEqual(tstStart);
+      expect(at + 7).toBeLessThan(tstStart + tstInfo.length);
       const tampered = token.slice();
       // Same-length edit of the day digit keeps the DER structure intact.
       tampered[at + 7] = tampered[at + 7] === 0x30 ? 0x31 : tampered[at + 7]! - 1;
       const r = await verifyTimestamp(tampered, signerSig);
       expect(r.valid).toBe(false);
       expect(r.badge).not.toBe('gold');
+    },
+  );
+
+  it.runIf(HAS_KAT)(
+    'finds the TSA cert by the SignerInfo sid even when another cert is listed first',
+    async () => {
+      // certificates is not signed: a token may list its CA (or anything)
+      // before the TSA leaf. Taking certificates[0] then checked the TSA
+      // signature against the wrong key (Opus, 2026-09-23).
+      const token = loadKatToken();
+      const meta = loadKatMeta();
+      const signerSig = new TextEncoder().encode(meta.plaintext);
+      const ci = new pkijs.ContentInfo({ schema: asn1js.fromBER(toAbLocal(token)).result });
+      const sd = new pkijs.SignedData({ schema: ci.content });
+      const other = new pkijs.Certificate({
+        schema: asn1js.fromBER(toAbLocal(pemToDerLocal(OTHER_CERT_PEM))).result,
+      });
+      sd.certificates = [other, ...(sd.certificates ?? [])];
+      const reordered = new Uint8Array(
+        new pkijs.ContentInfo({ contentType: ci.contentType, content: sd.toSchema(true) })
+          .toSchema()
+          .toBER(false),
+      );
+      const r = await verifyTimestamp(reordered, signerSig);
+      expect(r.valid).toBe(true);
+      expect(r.badge).toBe('gold');
     },
   );
 

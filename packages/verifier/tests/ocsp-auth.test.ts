@@ -35,17 +35,21 @@ async function makeCert(
   cn: string,
   serial: string,
   issuer?: Gen & { forge: forge.pki.Certificate; forgeKey: forge.pki.rsa.PrivateKey },
+  opts: { ca?: boolean; ocspSigning?: boolean; notBefore?: Date; notAfter?: Date } = {},
 ) {
   const keys = forge.pki.rsa.generateKeyPair(2048);
   const cert = forge.pki.createCertificate();
   cert.publicKey = keys.publicKey;
   cert.serialNumber = serial;
-  cert.validity.notBefore = new Date(Date.now() - YEAR);
-  cert.validity.notAfter = new Date(Date.now() + YEAR);
+  cert.validity.notBefore = opts.notBefore ?? new Date(Date.now() - YEAR);
+  cert.validity.notAfter = opts.notAfter ?? new Date(Date.now() + YEAR);
   const attrs = [{ name: 'commonName', value: cn }];
   cert.setSubject(attrs);
   cert.setIssuer(issuer ? issuer.forge.subject.attributes : attrs);
-  cert.setExtensions([{ name: 'basicConstraints', cA: !issuer }]);
+  cert.setExtensions([
+    { name: 'basicConstraints', cA: opts.ca ?? !issuer },
+    ...(opts.ocspSigning ? [{ name: 'extKeyUsage', '1.3.6.1.5.5.7.3.9': true }] : []), // id-kp-OCSPSigning
+  ]);
   cert.sign(issuer ? issuer.forgeKey : keys.privateKey, forge.md.sha256.create());
   const der = Uint8Array.from(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes(), (c) =>
     c.charCodeAt(0),
@@ -94,11 +98,13 @@ async function ocspMulti(
   entries: (OcspOpts & { about: pkijs.Certificate; issuer: pkijs.Certificate })[],
   responderIssuer: pkijs.Certificate,
   signer: Gen,
+  delegated: { responder?: pkijs.Certificate; certs?: pkijs.Certificate[]; producedAt?: Date } = {},
 ): Promise<Uint8Array> {
   const basic = new pkijs.BasicOCSPResponse();
-  basic.tbsResponseData.responderID = responderIssuer.subject;
-  basic.tbsResponseData.producedAt = new Date();
+  basic.tbsResponseData.responderID = (delegated.responder ?? responderIssuer).subject;
+  basic.tbsResponseData.producedAt = delegated.producedAt ?? new Date();
   for (const e of entries) basic.tbsResponseData.responses.push(await singleResponse(e));
+  if (delegated.certs) basic.certs = delegated.certs;
   await basic.sign(signer.privateKey, 'SHA-256');
   const resp = new pkijs.OCSPResponse();
   resp.responseStatus.valueBlock.valueDec = 0;
@@ -292,4 +298,112 @@ describe('the earliest authenticated revocation decides, whatever the DSS order'
       expect(ltv.signerRevocation?.revokedAt?.toISOString()).toBe(early.toISOString());
     });
   }
+});
+
+describe('delegated OCSP responders (RFC 6960 §4.2.2.2)', () => {
+  // Opus + Fable (2026-09-23): pkijs's BasicOCSPResponse.verify builds a
+  // chain from [responder, ...attached CAs] and validates the LAST one, not
+  // the responder, so an impostor responder passed with any real CA attached.
+  const ask = () =>
+    checkOcsp({ signerCert: signer.pkijsCert, issuerCert: ca.pkijsCert, acSlug: 'x' });
+
+  test('legit delegated responder issued by the CA → good', async () => {
+    const responder = await makeCert('OCSP RESPONDER', '50', ca, { ca: false, ocspSigning: true });
+    serveOcsp(
+      await ocspMulti(
+        [{ about: signer.pkijsCert, issuer: ca.pkijsCert }],
+        ca.pkijsCert,
+        responder,
+        {
+          responder: responder.pkijsCert,
+          certs: [responder.pkijsCert],
+        },
+      ),
+    );
+    expect((await ask()).status).toBe('good');
+  });
+
+  test('legit delegated responder that also attaches the CA → good (no false warning)', async () => {
+    const responder = await makeCert('OCSP RESPONDER 2', '51', ca, {
+      ca: false,
+      ocspSigning: true,
+    });
+    serveOcsp(
+      await ocspMulti(
+        [{ about: signer.pkijsCert, issuer: ca.pkijsCert }],
+        ca.pkijsCert,
+        responder,
+        {
+          responder: responder.pkijsCert,
+          certs: [responder.pkijsCert, ca.pkijsCert],
+        },
+      ),
+    );
+    expect((await ask()).status).toBe('good');
+  });
+
+  test('self-signed impostor responder with a real CA-issued cert attached → not good', async () => {
+    const impostor = await makeCert('IMPOSTOR', '52', undefined, { ca: false, ocspSigning: true });
+    const realSubCa = await makeCert('REAL SUB CA', '53', ca, { ca: true });
+    serveOcsp(
+      await ocspMulti([{ about: signer.pkijsCert, issuer: ca.pkijsCert }], ca.pkijsCert, impostor, {
+        responder: impostor.pkijsCert,
+        certs: [impostor.pkijsCert, realSubCa.pkijsCert],
+      }),
+    );
+    const r = await ask();
+    expect(r.status).toBe('unknown');
+    expect(r.reason).toBe('ocsp_signature_not_verified');
+  });
+
+  test('responder issued by the CA but without id-kp-OCSPSigning → not good', async () => {
+    const noEku = await makeCert('NO EKU', '54', ca, { ca: false });
+    serveOcsp(
+      await ocspMulti([{ about: signer.pkijsCert, issuer: ca.pkijsCert }], ca.pkijsCert, noEku, {
+        responder: noEku.pkijsCert,
+        certs: [noEku.pkijsCert],
+      }),
+    );
+    expect((await ask()).status).toBe('unknown');
+  });
+
+  test('responder not yet valid / expired at producedAt → not good', async () => {
+    const expired = await makeCert('EXPIRED RESPONDER', '55', ca, {
+      ca: false,
+      ocspSigning: true,
+      notBefore: new Date(Date.now() - 3 * YEAR),
+      notAfter: new Date(Date.now() - 2 * YEAR),
+    });
+    serveOcsp(
+      await ocspMulti([{ about: signer.pkijsCert, issuer: ca.pkijsCert }], ca.pkijsCert, expired, {
+        responder: expired.pkijsCert,
+        certs: [expired.pkijsCert],
+      }),
+    );
+    expect((await ask()).status).toBe('unknown');
+  });
+
+  test('embedded historical response: responder valid at producedAt, expired now → still authenticated', async () => {
+    const producedAt = new Date(Date.now() - 2 * YEAR);
+    const oldResponder = await makeCert('OLD RESPONDER', '56', ca, {
+      ca: false,
+      ocspSigning: true,
+      notBefore: new Date(Date.now() - 3 * YEAR),
+      notAfter: new Date(Date.now() - YEAR),
+    });
+    const revokedAt = new Date(Date.now() - 2 * YEAR - 1000);
+    const der = await ocspMulti(
+      [{ about: signer.pkijsCert, issuer: ca.pkijsCert, revokedAt, thisUpdate: producedAt }],
+      ca.pkijsCert,
+      oldResponder,
+      { responder: oldResponder.pkijsCert, certs: [oldResponder.pkijsCert], producedAt },
+    );
+    const ltv = await verifyLtv(
+      [signer.pkijsCert, ca.pkijsCert],
+      { certs: [], ocsps: [der], crls: [], vri: {} },
+      new Uint8Array([1]),
+      new Uint8Array(0),
+    );
+    expect(ltv.signerRevocation?.revokedAt?.toISOString()).toBe(revokedAt.toISOString());
+  });
 });

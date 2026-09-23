@@ -105,7 +105,8 @@ async function addDelegatedAnchors(
 function sameTbs(a: Certificate, b: Certificate): boolean {
   const x = a.tbsView;
   const y = b.tbsView;
-  if (x.byteLength !== y.byteLength) return false;
+  // An empty view means "not decoded from DER": never a proof of identity.
+  if (x.byteLength === 0 || x.byteLength !== y.byteLength) return false;
   for (let i = 0; i < x.byteLength; i++) if (x[i] !== y[i]) return false;
   return true;
 }

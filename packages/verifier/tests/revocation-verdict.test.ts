@@ -23,6 +23,8 @@ const FIX = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const SIGNED_AT = new Date('2026-06-01T12:00:00Z');
 // Time the mocked timestamp claims; a test may move it.
 const tsa = vi.hoisted(() => ({ time: new Date('2026-06-01T12:00:00Z') }));
+// DSS the mocked extractor returns; undefined = the fixture's own (none).
+const dss = vi.hoisted(() => ({ data: undefined as unknown }));
 const DAY = 24 * 60 * 60 * 1000;
 
 vi.mock('../src/integrity', async () => {
@@ -54,6 +56,15 @@ vi.mock('../src/pathValidation', () => ({
   })),
 }));
 vi.mock('../src/ocsp', () => ({ checkOcsp: vi.fn() }));
+vi.mock('../src/dss', async () => {
+  const actual = await vi.importActual<typeof import('../src/dss')>('../src/dss');
+  return {
+    ...actual,
+    extractDss: vi.fn((bytes: Uint8Array) =>
+      dss.data === undefined ? actual.extractDss(bytes) : { data: dss.data },
+    ),
+  };
+});
 vi.mock('../src/ltv', async () => {
   const actual = await vi.importActual<typeof import('../src/ltv')>('../src/ltv');
   return { ...actual, verifyLtv: vi.fn() };
@@ -92,6 +103,7 @@ const noLtv = {
 beforeEach(async () => {
   vi.restoreAllMocks();
   tsa.time = SIGNED_AT;
+  dss.data = undefined;
   checkOcspMock.mockReset();
   verifyLtvMock.mockReset();
   verifyLtvMock.mockResolvedValue(noLtv);
@@ -228,5 +240,73 @@ describe('a trusted timestamp keeps an expired cert valid', () => {
     expect(r.warnings.map((w) => w.code)).not.toContain('signing_time_unproven');
     // Validated at the timestamp time, never at "now".
     expect(vi.mocked(pathMod.validatePath).mock.calls[0]?.[3]).toEqual(SIGNED_AT);
+  });
+});
+
+describe('embedded DSS only replaces live OCSP when it authenticated something about the signer', () => {
+  const garbageDss = { certs: [], ocsps: [new Uint8Array([0x30, 0x00])], crls: [], vri: {} };
+
+  test('DSS bytes without authenticated signer evidence do not suppress live OCSP', async () => {
+    withTimestampToken();
+    dss.data = garbageDss;
+    verifyLtvMock.mockResolvedValue({ ...noLtv, dssPresent: true, profile: 'B-LT' });
+    checkOcspMock.mockResolvedValue({
+      status: 'revoked',
+      source: 'live',
+      checkedAt: new Date().toISOString(),
+      revokedAt: new Date(SIGNED_AT.getTime() - DAY).toISOString(),
+    });
+    const r = await verifyPdf(await loadPdf());
+    expect(checkOcspMock).toHaveBeenCalled();
+    expect(r.status).toBe('invalid');
+  });
+
+  test('authenticated signer evidence in the DSS → live OCSP skipped (control)', async () => {
+    withTimestampToken();
+    dss.data = garbageDss;
+    verifyLtvMock.mockResolvedValue({
+      ...noLtv,
+      dssPresent: true,
+      profile: 'B-LT',
+      signerEvidence: true,
+    });
+    const r = await verifyPdf(await loadPdf());
+    expect(checkOcspMock).not.toHaveBeenCalled();
+    expect(r.status).toBe('valid');
+  });
+
+  test('embedded scan cut short, nothing authenticated, live OCSP inconclusive → warning revocation_unchecked', async () => {
+    withTimestampToken();
+    dss.data = garbageDss;
+    verifyLtvMock.mockResolvedValue({
+      ...noLtv,
+      dssPresent: true,
+      profile: 'B-LT',
+      revocationIncomplete: true,
+    });
+    checkOcspMock.mockResolvedValue({
+      status: 'unknown',
+      source: 'live',
+      checkedAt: new Date().toISOString(),
+    });
+    const r = await verifyPdf(await loadPdf());
+    expect(r.status).toBe('warning');
+    expect(r.warnings.map((w) => w.code)).toContain('revocation_unchecked');
+  });
+
+  test('a CA of the chain revoked before the timestamp (authenticated DSS) → invalid', async () => {
+    withTimestampToken();
+    verifyLtvMock.mockResolvedValue({
+      ...noLtv,
+      caRevocation: { revokedAt: new Date(SIGNED_AT.getTime() - DAY) },
+    });
+    checkOcspMock.mockResolvedValue({
+      status: 'good',
+      source: 'live',
+      checkedAt: new Date().toISOString(),
+    });
+    const r = await verifyPdf(await loadPdf());
+    expect(r.status).toBe('invalid');
+    expect(r.warnings.map((w) => w.code)).toContain('cert_revoked');
   });
 });

@@ -45,8 +45,23 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
   emisor (según el algoritmo de cada `CertID`) antes de mirar su estado.
 - Un sello añadido después de que caducara el certificado ya no da «Firma inválida — emisor no
   reconocido»: se valida en la fecha declarada como `signing_time_unproven`.
-- Un certificado sin uso de clave de firma (`digitalSignature`/`nonRepudiation`) se rechaza
-  (`key_usage_not_signing`) en lugar de generar solo un aviso.
+- **Respondedores OCSP delegados autenticados de verdad.** `BasicOCSPResponse.verify` de pkijs tiene el
+  mismo defecto de orden: validaba el último certificado adjunto, no el respondedor, así que un
+  respondedor impostor pasaba adjuntando cualquier CA real (y una DSS añadida al PDF podía hacer pasar
+  por revocada una firma legítima). Ahora el respondedor debe estar emitido directamente por la CA del
+  certificado consultado, llevar `id-kp-OCSPSigning`, estar vigente cuando se produjo la respuesta
+  (`producedAt`, no hoy) y haber firmado la respuesta (RFC 6960 §4.2.2.2).
+- **La DSS solo sustituye al OCSP en vivo si aporta evidencia autenticada del firmante.** Antes bastaban
+  unos bytes cualesquiera en `/DSS` para no consultarlo. La LTV se evalúa ahora antes que el OCSP. Si la
+  revisión embebida se corta por tiempo, no hay evidencia autenticada y el OCSP en vivo no la zanja, la
+  firma queda en advertencia (`revocation_unchecked`), nunca `valid`.
+- La revocación autenticada de una **CA intermedia** anterior a la hora probada invalida la firma igual
+  que la del firmante.
+- El certificado de la TSA se elige por el `sid` del firmante del sello, no por su posición en
+  `certificates`.
+- Un certificado cuyo `keyUsage` no incluye `digitalSignature` ni `nonRepudiation` se rechaza
+  (`key_usage_not_signing`) en lugar de generar solo un aviso. Un certificado sin la extensión
+  `keyUsage` no se rechaza por ello (RFC 5280: uso no restringido).
 - Se retira la degradación a advertencia por «raíces parcialmente placeholder» (`TRUST_PARTIAL`):
   bastaba una raíz placeholder activa para que cualquier cadena rechazada, incluida una falsificada,
   pasara a advertencia. `TRUST_PLACEHOLDER` (todas las raíces placeholder) no cambia.
@@ -64,6 +79,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
   estaba en el bundle de intermedias de TSA (solo CA1 2021).
 - El emisor usado para OCSP/CRL en «Validar certificado» se resuelve por AKI/SKI y firma, no por CN.
 - OCSP recibe como emisor la CA emisora real (antes podía recibir la raíz).
+- Una respuesta OCSP en vivo que no se puede autenticar o no es vigente ahora da `ocsp_unavailable`
+  (advertencia); antes quedaba como no consultada y la firma salía `valid`.
+- La PWA tiene resúmenes propios para `revoked_after_signing` y `revocation_unchecked`.
 - La PWA muestra «Fecha de firma no demostrada» para `signing_time_unproven` en lugar de «Firma válida
   con advertencias», y el resumen de revocación sale del código `cert_revoked`, no del estado OCSP.
 - Nuevos resúmenes en la PWA para `key_usage_not_signing` y `signer_cert_not_valid` (certificado no

@@ -31,6 +31,21 @@ const OID_ID_CT_TST_INFO = '1.2.840.113549.1.9.16.1.4';
 const OID_CONTENT_TYPE = '1.2.840.113549.1.9.3';
 const OID_MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
 
+/** SignerIdentifier match: IssuerAndSerialNumber, or [0] SubjectKeyIdentifier. */
+function certMatchesSid(cert: pkijs.Certificate, sid: unknown): boolean {
+  if (sid instanceof pkijs.IssuerAndSerialNumber) {
+    return cert.issuer.isEqual(sid.issuer) && cert.serialNumber.isEqual(sid.serialNumber);
+  }
+  const ski = (sid as { valueBlock?: { valueHexView?: Uint8Array } })?.valueBlock?.valueHexView;
+  if (!ski) return false;
+  const ext = cert.extensions?.find((e) => e.extnID === '2.5.29.14');
+  const certSki = (ext?.parsedValue as { valueBlock?: { valueHexView?: Uint8Array } } | undefined)
+    ?.valueBlock?.valueHexView;
+  if (!certSki || certSki.length !== ski.length) return false;
+  for (let i = 0; i < ski.length; i++) if (certSki[i] !== ski[i]) return false;
+  return true;
+}
+
 function getInnerArrayBuffer(u8: Uint8Array): ArrayBuffer {
   return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength) as ArrayBuffer;
 }
@@ -173,6 +188,19 @@ export function parseTimestampToken(token: Uint8Array): ParsedTimestampToken {
     throw new Error('token: no SignerInfo');
   }
   const si = signerInfos[0]!;
+
+  // The TSA cert is the one the SignerInfo names (sid), not whichever comes
+  // first in SignedData.certificates: a token listing its CA before the leaf
+  // would otherwise be checked against the wrong key. Move it to index 0,
+  // which is where verifyTimestamp takes it from.
+  const certObjs = (certs ?? []).filter(
+    (c): c is pkijs.Certificate => c instanceof pkijs.Certificate,
+  );
+  const signerIdx = certObjs.findIndex((c) => certMatchesSid(c, si.sid));
+  if (signerIdx > 0) {
+    const [signerDer] = tsaCertDers.splice(signerIdx, 1);
+    if (signerDer) tsaCertDers.unshift(signerDer);
+  }
 
   // signedAttrs are stored on SignerInfo.signedAttrs; encode them as a SET-tagged DER for
   // the verifier to recompute the digest. Apply the [0] → SET (0xa0 → 0x31) patch to

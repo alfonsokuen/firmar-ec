@@ -181,6 +181,23 @@ async function selectBridgingIntermediates(
 }
 
 /**
+ * The revocation that decides a verdict among several: the earliest date, and
+ * an undated one over any dated one (fail closed).
+ */
+function earliestRevocation(
+  ...found: ({ revokedAt?: Date } | undefined)[]
+): { revokedAt?: Date } | undefined {
+  let best: { revokedAt?: Date } | undefined;
+  for (const r of found) {
+    if (!r) continue;
+    if (!best) best = r;
+    else if (best.revokedAt === undefined) return best;
+    else if (r.revokedAt === undefined || r.revokedAt < best.revokedAt) best = r;
+  }
+  return best;
+}
+
+/**
  * Verify a single PAdES signature against the given PDF bytes. Internal helper
  * used by both `verifyPdf` (first/only signature, back-compat) and
  * `verifyAllSignatures` (enumerates every signature for multi-firma PDFs).
@@ -409,9 +426,46 @@ async function verifyOneSignature(
     // (no fast RST), so the fetch stalls instead of failing fast. That stall
     // hung the whole verification on Android Chrome (reported 2026-05-20).
     // Only B-T (timestamp but NO DSS) still attempts a bounded live OCSP.
-    const hasEmbeddedRevocation =
-      dssOutcome.data !== undefined &&
-      ((dssOutcome.data.ocsps?.length ?? 0) > 0 || (dssOutcome.data.crls?.length ?? 0) > 0);
+    // F7 — verifyLtv runs after path validation so we can pass the chain.
+    // Always runs (even when DSS absent) to detect document timestamps.
+    phase('ltv');
+    // 2026-09-23: runs BEFORE the live OCSP decision, so that only
+    // authenticated embedded evidence about the signer can replace it.
+    // Hard deadline (v0.7.39): on a mobile CPU LTV can still hang. On a mobile CPU it can still
+    // hang — the v0.7.38 size-cap + Date.now() budget only bound SYNCHRONOUS
+    // work; an `await` that never settles (e.g. the B-LTA document-timestamp
+    // crypto, or a slow parse inside an awaited call) slips past them and the
+    // 30s watchdog fires (`verify:#5 ltv` persisted through 0.7.36–0.7.38).
+    // Racing verifyLtv against a wall-clock deadline guarantees the phase
+    // returns regardless of what stalls inside, degrading to a DSS-presence
+    // summary with an `ltv_timeout` note.
+    const ltvSummary = await Promise.race([
+      verifyLtv(path.chain ?? [], dssOutcome.data, sig.contents, pdfBytes),
+      new Promise<import('./ltv').LtvSummary>((resolve) =>
+        setTimeout(() => {
+          const d = dssOutcome.data;
+          const ocspN = d?.ocsps?.length ?? 0;
+          const crlN = d?.crls?.length ?? 0;
+          resolve({
+            profile: ocspN > 0 || crlN > 0 ? 'B-LT' : 'B-T',
+            dssPresent: d !== undefined,
+            embeddedOcspCount: ocspN,
+            embeddedCrlCount: crlN,
+            retrospectiveValid: false,
+            revocationIncomplete: true,
+            errors: [
+              'ltv_timeout: validación de revocación a largo plazo excedió el tiempo en este dispositivo',
+            ],
+          });
+        }, 12_000),
+      ),
+    ]);
+
+    // 2026-09-23: skip live OCSP only when the DSS actually carried
+    // AUTHENTICATED evidence about the signer. Any OCSP/CRL bytes used to
+    // suppress it — a revoked signer could embed garbage and never be asked
+    // about (Codex, Fable). The fetch is bounded (checkOcsp races a deadline).
+    const hasEmbeddedRevocation = ltvSummary.signerEvidence === true;
     let ocsp: VerificationResult['ocsp'] = { status: 'not_checked', source: 'none' };
     if (
       opts.fetchOcsp !== false &&
@@ -570,42 +624,15 @@ async function verifyOneSignature(
       });
     }
 
-    // F7 — verifyLtv runs after path validation so we can pass the chain.
-    // Always runs (even when DSS absent) to detect document timestamps.
-    phase('ltv');
-    // Hard deadline (v0.7.39): LTV is purely informational and NEVER changes
-    // the outer signature validity (spec §6.4). On a mobile CPU it can still
-    // hang — the v0.7.38 size-cap + Date.now() budget only bound SYNCHRONOUS
-    // work; an `await` that never settles (e.g. the B-LTA document-timestamp
-    // crypto, or a slow parse inside an awaited call) slips past them and the
-    // 30s watchdog fires (`verify:#5 ltv` persisted through 0.7.36–0.7.38).
-    // Racing verifyLtv against a wall-clock deadline guarantees the phase
-    // returns regardless of what stalls inside, degrading to a DSS-presence
-    // summary with an `ltv_timeout` note.
-    const ltvSummary = await Promise.race([
-      verifyLtv(path.chain ?? [], dssOutcome.data, sig.contents, pdfBytes),
-      new Promise<import('./ltv').LtvSummary>((resolve) =>
-        setTimeout(() => {
-          const d = dssOutcome.data;
-          const ocspN = d?.ocsps?.length ?? 0;
-          const crlN = d?.crls?.length ?? 0;
-          resolve({
-            profile: ocspN > 0 || crlN > 0 ? 'B-LT' : 'B-T',
-            dssPresent: d !== undefined,
-            embeddedOcspCount: ocspN,
-            embeddedCrlCount: crlN,
-            retrospectiveValid: false,
-            errors: [
-              'ltv_timeout: validación de revocación a largo plazo excedió el tiempo en este dispositivo',
-            ],
-          });
-        }, 12_000),
-      ),
-    ]);
     // Embedded (DSS) revocation evidence, authenticated inside verifyLtv, now
     // affects the verdict too — before, it only produced an ltv_warning and a
     // revoked signer could still come out `valid`.
-    const embeddedRevocation = ltvSummary.signerRevocation;
+    // A CA of the chain revoked before the proven signing time breaks the
+    // chain just like a revoked signer.
+    const embeddedRevocation = earliestRevocation(
+      ltvSummary.signerRevocation,
+      ltvSummary.caRevocation,
+    );
     if (embeddedRevocation && status !== 'invalid') {
       if (revokedBeforeProof(embeddedRevocation.revokedAt)) {
         status = 'invalid';
@@ -624,6 +651,25 @@ async function verifyOneSignature(
         code: 'revoked_after_signing',
         message:
           'El certificado del firmante fue revocado después de la fecha probada de la firma. La firma era válida cuando se selló.',
+      });
+    }
+
+    // Revocation could not be established: the embedded scan stopped early,
+    // it found nothing authenticated about the signer, and no live OCSP
+    // answer settled it. Not a failure of the signature — but never `valid`
+    // on an unfinished check (Codex, Opus, Fable).
+    const liveSettled = ocsp?.status === 'good' || ocsp?.status === 'revoked';
+    if (
+      ltvSummary.dssPresent &&
+      ltvSummary.revocationIncomplete &&
+      !ltvSummary.signerEvidence &&
+      !liveSettled
+    ) {
+      if (status === 'valid') status = 'warning';
+      warnings.push({
+        code: 'revocation_unchecked',
+        message:
+          'No se pudo terminar de comprobar la revocación del certificado en este dispositivo. La firma no se da por válida sin esa comprobación.',
       });
     }
 

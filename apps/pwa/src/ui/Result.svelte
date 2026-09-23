@@ -69,9 +69,18 @@ const v = $derived(VARIANTS[result.status]);
 
 // A chain valid only at the signer-declared date is not "valid with minor
 // warnings": the date is the signer's word. Give it its own title.
+const warningCodes = $derived(new Set(result.warnings.map((w) => w.code)));
 const signingTimeUnproven = $derived(
-  result.status === 'warning' && result.warnings.some((w) => w.code === 'signing_time_unproven'),
+  result.status === 'warning' && warningCodes.has('signing_time_unproven'),
 );
+// Specific summaries for warnings that change what "valid" means.
+const warningSummaryKey = $derived.by<UIKey | null>(() => {
+  if (result.status !== 'warning') return null;
+  if (warningCodes.has('revocation_unchecked'))
+    return 'verificar.warning_summary_revocation_unchecked';
+  if (warningCodes.has('revoked_after_signing')) return 'verificar.warning_summary_revoked_after';
+  return null;
+});
 const titleKey = $derived<UIKey>(signingTimeUnproven ? 'verificar.warning_unproven_time' : v.title);
 
 /**
@@ -92,6 +101,7 @@ const titleKey = $derived<UIKey>(signingTimeUnproven ? 'verificar.warning_unprov
 const summaryKey = $derived.by<UIKey>(() => {
   const codes = new Set(result.warnings.map((w) => w.code));
   if (signingTimeUnproven) return 'verificar.warning_summary_unproven_time';
+  if (warningSummaryKey) return warningSummaryKey;
   if (result.status !== 'invalid') return v.summary;
   // Hash mismatch / bad signature are the only true integrity failures.
   // `integrity` is absent when verification threw (engine-error path in

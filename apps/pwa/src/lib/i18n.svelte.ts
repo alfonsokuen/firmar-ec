@@ -42,6 +42,10 @@ export const ui = {
     'verificar.valid_summary': 'La firma es auténtica y el documento no ha sido modificado.',
     'verificar.warning': 'Firma válida con advertencias',
     'verificar.warning_unproven_time': 'Fecha de firma no demostrada',
+    'verificar.warning_summary_revoked_after':
+      'El certificado del firmante fue revocado después de la fecha probada de la firma. La firma era válida cuando se selló.',
+    'verificar.warning_summary_revocation_unchecked':
+      'No se pudo terminar de comprobar si el certificado del firmante fue revocado. La firma no se da por válida sin esa comprobación.',
     'verificar.warning_summary_unproven_time':
       'La cadena de certificados no es válida hoy y ningún sello de tiempo prueba cuándo se firmó. Solo sería válida en la fecha que declara el propio firmante, que no puede comprobarse.',
     'verificar.warning_summary':
@@ -888,6 +892,10 @@ export const ui = {
     'verificar.valid_summary': 'The signature is authentic and the document has not been modified.',
     'verificar.warning': 'Valid signature with warnings',
     'verificar.warning_unproven_time': 'Signing date not proven',
+    'verificar.warning_summary_revoked_after':
+      "The signer's certificate was revoked after the proven signing date. The signature was valid when it was timestamped.",
+    'verificar.warning_summary_revocation_unchecked':
+      "We could not finish checking whether the signer's certificate was revoked. The signature is not reported as valid without that check.",
     'verificar.warning_summary_unproven_time':
       'The certificate chain is not valid today and no timestamp proves when this was signed. It would only be valid on the date the signer declared, which cannot be checked.',
     'verificar.warning_summary':

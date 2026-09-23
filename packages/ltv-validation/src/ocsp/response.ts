@@ -41,6 +41,7 @@ const OID_OCSP_NONCE = '1.3.6.1.5.5.7.48.1.2';
 const DETAIL_MISSING_EKU = 'responder_missing_ocsp_signing_eku';
 const DETAIL_SIGNER_NOT_FOUND = 'responder_certificate_not_found';
 const DETAIL_NO_MATCH = 'no_matching_single_response';
+const DETAIL_RESPONDER_NOT_AUTHORIZED = 'responder_not_issued_by_ca_or_not_valid';
 
 export interface ParsedOcspResponse {
   /** Hex of issuerNameHash + issuerKeyHash + serial (concatenated) of the SELECTED SingleResponse. */
@@ -226,53 +227,80 @@ async function resolveSigner(
   const crypto = pkijs.getCrypto(true);
   const certsArr = basic.certs ?? [];
   const responderID = basic.tbsResponseData.responderID;
+  const producedAt = basic.tbsResponseData.producedAt;
 
-  let responderPkiCert: pkijs.Certificate | null = null;
-  let signatureValid = false;
-  let isSelfResponder = false;
-
-  if (certsArr.length > 0) {
-    const idx = await findResponderCertIndex(certsArr, responderID, crypto);
-    if (idx !== -1) responderPkiCert = certsArr[idx] ?? null;
+  const signedBy = async (key: pkijs.Certificate): Promise<boolean> => {
     try {
-      signatureValid = await basic.verify({ trustedCerts: [issuerPki] });
+      return await crypto.verifyWithPublicKey(
+        toAB(basic.tbsResponseData.tbsView),
+        basic.signature,
+        key.subjectPublicKeyInfo,
+        basic.signatureAlgorithm,
+      );
     } catch {
-      signatureValid = false;
+      return false;
     }
-    if (responderPkiCert) {
-      isSelfResponder = spkiHex(responderPkiCert) === spkiHex(issuerPki);
-    }
-  } else {
-    const matchesIssuer = await certMatchesResponderId(issuerPki, responderID, crypto);
-    if (matchesIssuer) {
-      isSelfResponder = true;
-      try {
-        signatureValid = await crypto.verifyWithPublicKey(
-          toAB(basic.tbsResponseData.tbsView),
-          basic.signature,
-          issuerPki.subjectPublicKeyInfo,
-          basic.signatureAlgorithm,
-        );
-      } catch {
-        signatureValid = false;
-      }
-    } else {
-      return {
-        signatureValid: false,
-        signatureDetail: DETAIL_SIGNER_NOT_FOUND,
-        responderPkiCert: null,
-      };
-    }
+  };
+
+  // 1. The issuing CA answers itself (responderID names the issuer).
+  if (await certMatchesResponderId(issuerPki, responderID, crypto)) {
+    return {
+      signatureValid: await signedBy(issuerPki),
+      signatureDetail: undefined,
+      responderPkiCert: null,
+    };
   }
 
-  if (signatureValid && !isSelfResponder) {
-    const hasEku = responderPkiCert ? hasOcspSigningEku(responderPkiCert) : false;
-    if (!hasEku) {
-      return { signatureValid: false, signatureDetail: DETAIL_MISSING_EKU, responderPkiCert };
-    }
+  // 2. Delegated responder (RFC 6960 §4.2.2.2): the cert named by responderID
+  // must be issued DIRECTLY by the CA that issued the queried cert, carry
+  // id-kp-OCSPSigning, be valid when the response was produced, and have
+  // signed the response. No chain building: pkijs's BasicOCSPResponse.verify
+  // validates the LAST attached cert, so an impostor responder passed with
+  // any real CA-issued cert attached (2026-09-23, Opus + Fable).
+  const idx = await findResponderCertIndex(certsArr, responderID, crypto);
+  const responder = idx === -1 ? null : (certsArr[idx] ?? null);
+  if (!responder) {
+    return {
+      signatureValid: false,
+      signatureDetail: DETAIL_SIGNER_NOT_FOUND,
+      responderPkiCert: null,
+    };
   }
-
-  return { signatureValid, signatureDetail: undefined, responderPkiCert };
+  if (spkiHex(responder) === spkiHex(issuerPki)) {
+    return {
+      signatureValid: await signedBy(issuerPki),
+      signatureDetail: undefined,
+      responderPkiCert: responder,
+    };
+  }
+  let issuedByCa = false;
+  try {
+    issuedByCa = responder.issuer.isEqual(issuerPki.subject) && (await responder.verify(issuerPki));
+  } catch {
+    issuedByCa = false;
+  }
+  const at = producedAt.getTime();
+  const validAtProduction =
+    responder.notBefore.value.getTime() <= at && at <= responder.notAfter.value.getTime();
+  if (!issuedByCa || !validAtProduction) {
+    return {
+      signatureValid: false,
+      signatureDetail: DETAIL_RESPONDER_NOT_AUTHORIZED,
+      responderPkiCert: responder,
+    };
+  }
+  if (!hasOcspSigningEku(responder)) {
+    return {
+      signatureValid: false,
+      signatureDetail: DETAIL_MISSING_EKU,
+      responderPkiCert: responder,
+    };
+  }
+  return {
+    signatureValid: await signedBy(responder),
+    signatureDetail: undefined,
+    responderPkiCert: responder,
+  };
 }
 
 interface SingleResponseView {

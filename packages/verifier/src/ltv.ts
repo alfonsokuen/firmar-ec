@@ -57,6 +57,16 @@ export interface LtvSummary {
    * The caller decides the verdict against the signature's proven time.
    */
   signerRevocation?: { revokedAt?: Date };
+  /** Same, for a CA of the chain above the signer (earliest, undated wins). */
+  caRevocation?: { revokedAt?: Date };
+  /**
+   * True when authenticated embedded evidence about the SIGNER was found
+   * (an OCSP answer or an issuer-signed CRL, good or revoked). Only then can
+   * the live OCSP check be skipped; the mere presence of DSS bytes says nothing.
+   */
+  signerEvidence?: boolean;
+  /** The scan stopped early (time budget or deadline): absence of a revocation proves nothing. */
+  revocationIncomplete?: boolean;
   /** Document timestamp (B-LTA). Absent when no /Sig /ETSI.RFC3161 found. */
   documentTimestamp?: DocumentTimestampSummary;
   /** Free-form diagnostic strings — never block outer signature. */
@@ -408,6 +418,8 @@ export async function verifyLtv(
   let budgetTripped = false;
 
   let signerRevocation: LtvSummary['signerRevocation'];
+  let caRevocation: LtvSummary['caRevocation'];
+  let signerEvidence = false;
 
   // We need pairs (subject, issuer) to verify OCSP signatures correctly.
   for (let i = 0; i < chain.length - 1; i++) {
@@ -456,9 +468,11 @@ export async function verifyLtv(
         revokedFound = true;
         linkRevoked = true;
         if (i === 0) signerRevocation = earlierRevocation(signerRevocation, parsed.revokedAt);
+        else caRevocation = earlierRevocation(caRevocation, parsed.revokedAt);
       } else if (parsed.certStatus === 'good') {
         retrospectiveValid = true;
       }
+      if (i === 0 && parsed.certStatus !== 'unknown') signerEvidence = true;
     }
 
     // CRLs too: an OCSP `good` must not hide a CRL that lists the cert.
@@ -485,11 +499,13 @@ export async function verifyLtv(
       // subject's issuer actually signed says anything about the subject.
       if (!(await crlIssuedBy(crl, issuer))) continue;
       const status = isCertRevoked(parseCert(subject), crl);
+      if (i === 0) signerEvidence = true;
       if (status.revoked) {
         if (!linkRevoked) errors.push(`cert_revoked_crl: ${getCN(subject) ?? 'unknown'}`);
         revokedFound = true;
         linkRevoked = true;
         if (i === 0) signerRevocation = earlierRevocation(signerRevocation, status.revokedAt);
+        else caRevocation = earlierRevocation(caRevocation, status.revokedAt);
       } else {
         retrospectiveValid = true;
       }
@@ -536,6 +552,9 @@ export async function verifyLtv(
     errors,
   };
   if (signerRevocation) result.signerRevocation = signerRevocation;
+  if (caRevocation) result.caRevocation = caRevocation;
+  if (signerEvidence) result.signerEvidence = true;
+  if (budgetTripped) result.revocationIncomplete = true;
   if (documentTimestamp) result.documentTimestamp = documentTimestamp;
   return result;
 }

@@ -262,4 +262,28 @@ describe('legacy X.509 v1 trust root (no extensions, e.g. APPFIRMAS S.A. Root AC
     expect(r.trusted).toBe(true);
     expect(r.matchedAceSlug).toBe('legacy');
   });
+
+  test('expired sub CA under a valid v1 root cannot act as the delegated anchor', async () => {
+    const expiredSub = makeCert({
+      cn: 'Legacy Sub CA Old',
+      isCa: true,
+      serial: '47',
+      issuer: v1Root,
+      notBefore: new Date(Date.now() - 3 * YEAR),
+      notAfter: new Date(Date.now() - YEAR),
+    });
+    const leaf = makeCert({
+      cn: 'UNDER EXPIRED SUB',
+      isCa: false,
+      serial: '48',
+      issuer: expiredSub,
+    });
+    const r = await validatePath(
+      toPkijs(leaf),
+      [toPkijs(expiredSub)],
+      [await asRoot('legacy', v1Root)],
+      new Date(),
+    );
+    expect(r.success).toBe(false);
+  });
 });
