@@ -1,7 +1,7 @@
 ---
 import BreadcrumbList from '../components/BreadcrumbList.astro';
 import { getLangFromUrl } from '../i18n/utils.ts';
-import { SITE, breadcrumbList, techArticle } from '../lib/jsonld.ts';
+import { SITE, breadcrumbList, faqPage, techArticle } from '../lib/jsonld.ts';
 import Base from './Base.astro';
 
 interface Props {
@@ -13,6 +13,7 @@ interface Props {
   dateModified?: string;
   breadcrumbs?: { name: string; url: string }[];
   related?: { title: string; href: string }[];
+  faq?: { question: string; answer: string }[];
 }
 
 const {
@@ -24,6 +25,7 @@ const {
   dateModified,
   breadcrumbs = [],
   related = [],
+  faq = [],
 } = Astro.props;
 const lang = getLangFromUrl(Astro.url);
 
@@ -45,6 +47,7 @@ const jsonld = [
     datePublished,
     ...(dateModified !== undefined && { dateModified }),
   }),
+  ...(faq.length > 0 ? [faqPage(faq)] : []),
 ];
 ---
 <Base title={title} description={description} routeKey={routeKey} ogType="article" jsonld={jsonld}>
@@ -63,6 +66,17 @@ const jsonld = [
     </header>
     <div class="prose prose-lg dark:prose-invert">
       <slot />
+      {faq.length > 0 && (
+        <section aria-labelledby="article-faq">
+          <h2 id="article-faq">{lang === 'es' ? 'Preguntas frecuentes' : 'Frequently asked questions'}</h2>
+          {faq.map((entry) => (
+            <div>
+              <h3>{entry.question}</h3>
+              <p>{entry.answer}</p>
+            </div>
+          ))}
+        </section>
+      )}
     </div>
     {related.length > 0 && (
       <aside class="mt-16 pt-8 border-t border-ink-200 dark:border-ink-800 not-prose">

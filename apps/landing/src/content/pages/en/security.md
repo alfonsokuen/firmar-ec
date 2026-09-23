@@ -2,6 +2,7 @@
 title: "Security and Transparency"
 description: "Security and technical transparency report for firmar.ec: threat model, controls, external audits, and responsible disclosure."
 lang: en
+dateModified: "2026-09-18"
 datePublished: "2026-05-08"
 h1: "Security and Transparency"
 breadcrumbs:
@@ -86,3 +87,7 @@ Public recognition for those who have helped improve firmar.ec's security:
 ## Paranoia mode
 
 To verify yourself that your key never leaves the browser, follow the instructions at [/paranoia](https://app.firmar.ec/paranoia) in the app.
+
+## Interpreting results
+
+See the [PDF signature verification methodology](/en/verification-methodology/): integrity, trust, revocation and time are separate checks. It includes a checklist for documenting a review and its limitations.

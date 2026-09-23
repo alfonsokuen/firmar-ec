@@ -23,6 +23,10 @@ export function useTranslations(lang: Lang) {
 // shape; the latter are handled by Caddy redir rules, not served by the landing.
 export const ROUTE_MAP: Record<string, { es: string; en: string }> = {
   home: { es: '/', en: '/en/' },
+  'metodologia-verificacion': {
+    es: '/metodologia-verificacion/',
+    en: '/en/verification-methodology/',
+  },
   firmar: { es: '/firmar', en: '/en/sign' },
   verificar: { es: '/verificar', en: '/en/verify' },
   seguridad: { es: '/seguridad/', en: '/en/security/' },

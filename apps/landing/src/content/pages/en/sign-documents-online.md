@@ -1,74 +1,77 @@
 ---
-title: "Sign documents online free | electronic signature Ecuador"
-description: "A free website to sign documents online with no installs. Learn how to electronically sign a document with your .p12 certificate (BCE, Security Data and other ARCOTEL ECIs)."
+title: "Sign documents online with an electronic signature in Ecuador"
+description: "Sign PDF documents online with your .p12 or .pfx certificate in Ecuador. Free tool, signing steps, privacy and requirements for submitting your PDF."
 lang: en
 datePublished: "2026-06-14"
-dateModified: "2026-08-23"
-h1: "Sign documents online"
+dateModified: "2026-09-16"
+h1: "Sign documents online with an electronic signature in Ecuador"
 breadcrumbs:
   - { name: "Sign documents online", url: "https://firmar.ec/en/sign-documents-online/" }
 related:
-  - { title: "How to sign a PDF", href: "/en/how-to-sign-pdf/" }
-  - { title: "Sign PDF online free without installing", href: "/en/sign-pdf-online-free-without-installing/" }
-  - { title: "Electronic signatures in Ecuador", href: "/en/electronic-signature-ecuador/" }
+  - { title: "Sign with a Security Data certificate", href: "/en/how-to-sign-with-security-data-certificate/" }
   - { title: "How to get a certificate", href: "/en/how-to-get-an-electronic-certificate/" }
-  - { title: "Verify a PDF signature", href: "/en/verify-pdf-signature/" }
-  - { title: "firmar.ec vs FirmaEC", href: "/en/comparisons/firmaec/" }
+  - { title: "Electronic signature prices", href: "/en/pricing/" }
+  - { title: "How to verify a PDF signature", href: "/en/verify-pdf-signature/" }
+  - { title: "Sign a PDF from your phone", href: "/en/sign-pdf-from-phone/" }
+  - { title: "Electronic signatures in Ecuador: legal framework", href: "/en/electronic-signature-ecuador/" }
+  - { title: "Compare firmar.ec and FirmaEC", href: "/en/comparisons/firmaec/" }
+faq:
+  - question: "How do you electronically sign a document in Ecuador?"
+    answer: "To sign a PDF in firmar.ec, you need an electronic certificate as a .p12 or .pfx file and its password. Select the PDF, place the visible signature, load the certificate, review the summary and sign. Download the result and verify the signature before submitting it."
+  - question: "Can I sign documents online for free?"
+    answer: "Yes. The firmar.ec web tool lets you sign PDFs for free without creating an account. You need your own electronic certificate: issuance and renewal are subject to your chosen provider's conditions and prices."
+  - question: "Can I sign a Word document or an XML invoice?"
+    answer: "This workflow signs PDFs. Export your Word document to PDF before starting. An electronic XML invoice requires the corresponding invoicing workflow; signing its PDF representation does not sign the XML."
+  - question: "Are my certificate and PDF sent to a server for signing?"
+    answer: "No. In this signing workflow, the PDF, .p12 or .pfx file and its password are processed in the browser. Timestamping or certificate status checks may require external connections."
+  - question: "Can I sign from my phone using a USB token?"
+    answer: "The web workflow uses .p12 or .pfx files selected from your device and does not support USB tokens. For a token, use the application and drivers recommended by its issuer."
 ---
 
-**firmar.ec is a website to sign documents online, free and with nothing to install.** You upload your PDF, load your `.p12` electronic certificate and download the signed document — all inside your browser. Your private key is never sent to any server. Below we explain how to electronically sign a document in Ecuador, what you need and why you can do it here for free.
+**You can sign PDF documents online with an electronic signature in Ecuador using a `.p12` or `.pfx` certificate and its password.** firmar.ec lets you do this for free in your computer or phone browser: select the PDF, load your certificate and download the signed document. You do not need to install a desktop application or create an account.
 
-[Sign a document now →](https://app.firmar.ec/)
+**The certificate and the signing tool are different things.** A provider issues the certificate to identify its holder; firmar.ec is the tool that uses it to sign the PDF. If you want to purchase an electronic certificate, start with [how to get one](/en/how-to-get-an-electronic-certificate/) and [how much it costs](/en/pricing/).
 
-## How do you electronically sign a document?
+[Sign a document now](https://app.firmar.ec/firmar)
 
-Signing documents with an electronic signature takes three steps and under a minute:
+## What do you need to sign documents online?
 
-1. **Upload the document.** Open the app and drop in the PDF you want to sign.
-2. **Load your certificate.** Select your `.p12` file (also called `.pfx`) and enter its password. The certificate is processed in your browser's memory; it never leaves your device.
-3. **Sign and download.** firmar.ec generates a valid PAdES signature and returns the signed document, ready for SRI, Quipux, SERCOP, a bank or any institution that requires it.
+- **A PDF** with the final content. Export documents from Word or other editors to PDF first.
+- **Your electronic certificate as a `.p12` or `.pfx` file** and its password. Check that it belongs to the person who must sign and is still valid.
+- **An up-to-date browser**, including on a phone.
 
-That's it. No sign-up, no signature limit, and no Java or drivers to install.
+If your certificate is from Security Data, see the [Security Data signing guide](/en/how-to-sign-with-security-data-certificate/). For other issuers, you can start by [validating your certificate](/en/validate-certificate/). USB tokens and credentials that work only in a provider's cloud require their own workflow.
 
-## A website to sign documents, with nothing to install
+## How to sign a PDF document step by step
 
-Most tools to sign electronic documents in Ecuador are desktop apps that require Java and token setup. firmar.ec is different: it's a **website to sign documents** that runs in any modern browser, including on mobile. No downloads, no runtimes to update and no dependency on your operating system.
+1. **Open the app.** Visit app.firmar.ec/firmar in your browser.
+2. **Select the PDF and place the visible signature.** Choose the page and position of the signature box.
+3. **Select your certificate.** Load the .p12 or .pfx file belonging to the person who must sign.
+4. **Check the password and sign.** Enter the file's password, review the holder and summary, and press Sign PDF.
+5. **Download and verify.** Save the signed PDF and check its signature before submitting it.
 
-Because signing happens client-side (using WebCrypto and `pkijs`), the document and the private key **never travel over the network**. It's the same privacy guarantee as an installed app, but with nothing to install.
-
-## Sign documents for free: what you pay and what you don't
-
-firmar.ec is **free** for personal use, for everyone in Ecuador. There is no document limit. Any service that charges to sign a PDF is charging for **convenience**, not validity: legal validity comes from your certificate issued by an accredited ECI, not from the software that uses it.
-
-All you need is a valid electronic signature certificate. If you don't have one yet, read [how to get an electronic certificate](/en/how-to-get-an-electronic-certificate/) or compare issuers and prices in the [Ecuador certificate issuers comparison](/en/certificate-issuers-ecuador/).
-
-## Sign documents with a signature recognised in Ecuador
-
-For the signature to carry the same legal validity as your handwritten one (Electronic Commerce Act, Law 2002-67), the certificate must come from an **Information Certification Entity (ECI) accredited by ARCOTEL**. firmar.ec recognises the roots of the accredited ECIs, including:
-
-- **Banco Central del Ecuador (BCE)** — the most widely used certificate for individuals and companies. Guide: [sign with a BCE certificate](/en/how-to-sign-with-bce-certificate/).
-- **Security Data** — one of the most used ECIs at the SRI and in banking. Guide: [sign documents with a Security Data certificate](/en/how-to-sign-with-security-data-certificate/).
-- **Uanataca, ArgosData, Consejo de la Judicatura, ANFAC, Eclipsoft, Datil** and other accredited ECIs.
-
-If your certificate was issued by any of them, firmar.ec recognises it automatically against the root list bundled with the app itself, without uploading anything to any server.
+The [how to sign a PDF guide](/en/how-to-sign-pdf/) explains the process further. To check the result, open [Verify PDF](https://app.firmar.ec/verificar) and select the downloaded file. Keep that PDF: printing it or converting it into an image does not preserve the cryptographic signature for verification.
 
 ## Which documents can you sign?
 
-firmar.ec signs **PDF documents** using the **PAdES** standard (the signature is embedded inside the PDF itself). It covers the vast majority of administrative paperwork:
+Use this workflow with contracts, minutes, forms, letters and other documents **in PDF format**. Before submitting them, check the recipient's requirements: they may specify a format, platform or additional evidence.
 
-- Contracts, addenda, NDAs and minutes.
-- Authorisations, sworn statements and powers of attorney in PDF.
-- Forms and letters for the public sector (municipalities, ministries, IESS).
-- Documents a bank or the SRI asks you to sign in PDF.
+For electronic invoicing, distinguish the **XML** document from its PDF representation. This PDF signing tool does not replace the system that creates and signs the XML for the SRI.
 
-For SRI electronic vouchers in XML (invoices, withholdings) the XAdES format is used, normally produced by your accounting system or by MINTEL's FirmaEC.
+## Where are the PDF and private key processed?
 
-## Legal validity of signed documents
+The signature is computed in your browser. **The PDF, `.p12` certificate and password are not sent to a signing server.** If you choose to share the result after downloading it, you are sending it to the recipient you select.
 
-A document signed with firmar.ec produces a **PAdES** signature equivalent to FirmaEC, MINTEL's official signer. Before the SRI, banks and public institutions, **a PDF signed with your certificate is fully valid** — what matters is the certificate, not the tool. You can check any signature at [verify a PDF signature](/en/verify-pdf-signature/).
+Some operations may need internet access: loading the application, obtaining intermediate certificates, requesting a timestamp or checking a certificate's status. Local document processing does not mean that there are no network connections at all.
 
-## Start signing documents online
+## What legal effect does an electronic signature have in Ecuador?
 
-You don't need an account. Open the app, upload your document and sign.
+Article 14 of the [Electronic Commerce, Electronic Signatures and Data Messages Act, published by ARCOTEL](https://www.arcotel.gob.ec/wp-content/uploads/2015/12/ley-comercio-electronico-firmas-electronicas-y-mensaje-de-datos.pdf) recognises legal effects equivalent to a handwritten signature. Article 15 sets validity requirements, including the link to the holder and the ability to verify identity and integrity.
 
-[Open firmar.ec and sign a document →](https://app.firmar.ec/)
+**Using a signing tool does not by itself guarantee acceptance for every procedure.** Check the certificate, verify the PDF signature and confirm the receiving institution's requirements. Read more about [electronic signatures in Ecuador](/en/electronic-signature-ecuador/).
+
+## What do you pay for when signing?
+
+Using the web tool to sign PDFs is free. The **electronic certificate** is obtained separately: each issuer sets prices, validity periods and renewal conditions. See [certificate prices](/en/pricing/) to compare the same storage format with VAT clearly identified.
+
+[I already have my certificate: open the signing tool](https://app.firmar.ec/firmar)

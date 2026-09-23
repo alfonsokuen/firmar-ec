@@ -1,0 +1,20 @@
+---
+import { getEntry, render } from 'astro:content';
+import ArticleSeo from '../../layouts/ArticleSeo.astro';
+
+const entry = await getEntry('pages', 'en/verification-methodology');
+if (!entry) throw new Error('Missing verification methodology content');
+const { Content } = await render(entry);
+const data = entry.data;
+---
+<ArticleSeo
+  title={data.title}
+  description={data.description}
+  routeKey="metodologia-verificacion"
+  h1={data.h1 ?? data.title}
+  datePublished={data.datePublished}
+  breadcrumbs={data.breadcrumbs}
+  related={data.related}
+>
+  <Content />
+</ArticleSeo>

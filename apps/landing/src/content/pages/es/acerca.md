@@ -2,6 +2,7 @@
 title: "Acerca de firmar.ec"
 description: "Por qué existe firmar.ec, quién está detrás, y por qué es gratis y open-source. Un proyecto de IDK Manager."
 lang: es
+dateModified: "2026-09-18"
 datePublished: "2026-05-08"
 h1: "Acerca de firmar.ec"
 breadcrumbs:
@@ -10,11 +11,7 @@ breadcrumbs:
 
 ## Por qué existe firmar.ec
 
-En Ecuador, **firmar electrónicamente un PDF** sigue siendo más complicado de lo que debería:
-
-- **FirmaEC del MINTEL** es una excelente app desktop, pero requiere Java instalado, configuración del driver del token, y no funciona en móvil ni en máquinas restringidas.
-- **Servicios SaaS comerciales** (Adobe Sign, DocuSign, etc.) piden subir tu certificado a sus servidores, lo cual incomoda a quien tomó en serio el cumplimiento de la **LOPDP**.
-- **Alternativas web open-source ecuatorianas** simplemente **no existían** hasta este proyecto.
+Queremos facilitar la firma y revisión de documentos PDF con certificado electrónico desde un navegador, sin que el usuario tenga que enviar su llave privada al servicio. Cada herramienta tiene requisitos y modelos de confianza distintos; nuestra propuesta es hacer explícito el nuestro y permitir su inspección.
 
 firmar.ec resuelve eso con **una PWA pública, gratuita, sin registro, sin tracking, donde tu llave privada nunca sale del navegador**.
 
@@ -28,26 +25,20 @@ El costo de mantenimiento (dominio, hosting, certificados, mantenimiento del có
 
 ## ¿Por qué open-source?
 
-Una herramienta que pide tu llave privada **debe ser auditable**. AGPL-3.0 + 3 mirrors públicos + releases firmadas con Sigstore Cosign + entrada pública en Rekor transparency log + SLSA L2 con elementos L3 existen para que cualquier persona, equipo o entidad pública pueda **verificar por sí misma** que firmar.ec se comporta como decimos. Reproducible builds: en roadmap.
+Una herramienta que procesa una llave privada debe poder inspeccionarse. Publicamos el [código fuente y su licencia AGPL-3.0](https://github.com/idkmanager/firmar-ec), las pruebas y las instrucciones de desarrollo. Revisa el código correspondiente a la versión que estés evaluando; una licencia abierta no equivale por sí sola a una auditoría independiente.
 
-Si vas a confiar tu firma electrónica a un servicio web, no aceptes "confía en nosotros". Verifica.
+Nuestra [metodología para interpretar una verificación](/metodologia-verificacion/) explica qué demuestra cada comprobación y qué límites debes registrar. El [perfil de Alfonso Kuen Arroyo](https://idkmanager.com/equipo/alfonso-kuen-arroyo/) identifica al responsable técnico del proyecto.
 
 ## ¿Cómo se sostiene en el tiempo?
 
-- **Código simple y mantenible** (Astro 5 + Svelte 5 + libs cripto auditadas) — minimiza la deuda técnica acumulada.
+- **Código simple y mantenible** (Astro 5 + Svelte 5 + bibliotecas criptográficas de código abierto) — minimiza la deuda técnica acumulada.
 - **La app es estática** — se sirve como archivos, sin servidor que la renderice; los costos de hosting son insignificantes. El único backend propio es el de los contadores agregados de uso (ver el aviso de privacidad).
 - **Comunidad** — aceptamos issues, PRs, traducciones. Si tu organización quiere contribuir o colaborar, escríbenos.
 - **Plan B** — si IDK Manager dejara de operar el servicio, el código sigue disponible en GitHub bajo AGPL-3.0; cualquiera puede continuar la operación con un nuevo dominio.
 
-## Roadmap visible
+## Estado del proyecto
 
-- **v1 (actual)**: firma + verificación de PDFs PAdES B-B con certificados de las 16 ECIs ecuatorianas acreditadas que operan raíz propia.
-- **v1.1**: firma con timestamp (PAdES B-T) cuando identifiquemos una TSA acreditada en EC.
-- **v1.2**: validación a largo plazo (PAdES B-LT) — cadena + revocación embebidas.
-- **v1.x**: Kichwa, firma masiva, integración WebAuthn 2FA, sello con foto.
-- **Aspiración**: si la comunidad lo pide, soporte de XAdES (XML, SRI) y CAdES (firma detached).
-
-Cada decisión de roadmap se discute en GitHub Issues. Tu opinión cuenta.
+Consulta las [versiones publicadas](https://github.com/idkmanager/firmar-ec/releases), el [historial de cambios](https://github.com/idkmanager/firmar-ec/blob/main/CHANGELOG.md) y las [propuestas abiertas](https://github.com/idkmanager/firmar-ec/issues). Son las referencias para distinguir funciones disponibles de trabajo propuesto. Las posibilidades de cada firma dependen de su configuración, del certificado y de la evidencia disponible.
 
 ## Contacto
 

@@ -1,9 +1,29 @@
+## Landing 0.7.9 — 2026-09-18
+
+- Align llms.txt source repository with the public IDK Manager canonical repository; both existing GitHub mirrors remain valid.
+- Clarify the default PAdES B-B profile and optional B-T/B-LT/B-LTA outcomes according to settings and completed evidence checks.
+
+## Landing 0.7.8 — 2026-09-18
+
+- Publish ES/EN PDF verification methodology with four evidence dimensions, a review checklist, dated source-code references and primary standards.
+- Connect the resource from verification, security, about, hreflang, sitemap and llms.txt.
+- Replace unsupported competitor/exclusivity claims and obsolete promises on About with inspectable project status.
+
 # Changelog
 
 Todos los cambios notables a este proyecto se documentan aquí.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Landing 0.7.7 — 2026-09-17
+
+- Las guías de Security Data y firma de documentos responden directamente a la intención de búsqueda y describen el flujo real de firma, sin prometer tiempos ni aceptación universal.
+- Precios sustituye rangos sin fuente por tarifas publicadas con IVA, modalidad, vigencia y fecha de consulta; corrige ICERT-EC a USD 27,60 por dos años.
+- Las FAQs de estas tres páginas se renderizan y generan JSON-LD desde una sola fuente; los HowTo reflejan los pasos visibles.
+- Las tres traducciones inglesas mantienen las mismas fuentes, tarifas, límites y pasos de sus equivalentes españoles.
+- La comparativa de emisores ES/EN refleja la misma tarifa oficial de ICERT-EC; se conservan los enlaces a comparativas y la atribución UTM de la tienda.
+- Las tablas de emisores se desplazan dentro de un contenedor accesible y dejan de ensanchar la página en móvil.
 
 ### PWA 0.27.0 / signer 0.12.0 — 2026-09-14
 - El QR de las nuevas firmas visibles también se puede pulsar para abrir el verificador de firmar.ec. El receptor selecciona el PDF y la validación sigue siendo local. Disponible en firma única y multifirma, con la zona pulsable ajustada a la rotación de la página. El enlace se incorpora antes de firmar; los PDF ya emitidos no cambian.

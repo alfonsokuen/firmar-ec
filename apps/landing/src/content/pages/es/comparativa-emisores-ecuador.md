@@ -3,7 +3,7 @@ title: "ECIs autorizadas por ARCOTEL en Ecuador: lista oficial y comparativa 202
 description: "Lista actualizada de las Entidades de Certificación de Información (ECI) acreditadas por ARCOTEL en Ecuador. Comparativa de tipos de certificado, vigencia, soporte, precio referencial y enlaces oficiales. Actualizado 2026."
 lang: es
 datePublished: "2026-05-29"
-dateModified: "2026-08-24"
+dateModified: "2026-09-17"
 h1: "Entidades de Certificación de Información (ECI) acreditadas por ARCOTEL — Ecuador 2026"
 breadcrumbs:
   - { name: "Comparativa ECIs Ecuador 2026", url: "https://firmar.ec/comparativa-emisores-ecuador/" }
@@ -32,10 +32,12 @@ Esto importa cuando firmas:
 
 ## Tabla comparativa — ECIs acreditadas por ARCOTEL (2026)
 
+<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Tabla comparativa de emisores de certificados">
+
 | ECI | Tipo | Formatos disponibles | Vigencia común | Precio referencial persona natural | Sitio oficial |
 |---|---|---|---|---|---|
 | **Banco Central del Ecuador (BCE)** — `eci.bce.ec` | Pública | Archivo `.p12`, token USB | 2 años | ~USD 28 + IVA | [eci.bce.ec](https://www.eci.bce.ec) |
-| **Consejo de la Judicatura — ICERT-EC** | Pública | Archivo `.p12`, token USB | 2 años | ~USD 19,80 + IVA (tarifa oficial) | [icert.fje.gob.ec](https://www.icert.fje.gob.ec) |
+| **Consejo de la Judicatura — ICERT-EC** | Pública | Archivo `.p12`; token con tarifa distinta | 2 años | **USD 27,60 IVA incluido, archivo** | [Tarifa oficial de ICERT-EC](https://www.icert.fje.gob.ec/tarifas-certificados/) |
 | **Registro Civil ECI** | Pública | Archivo `.p12`, token USB, cert móvil | 2 años | ~USD 30 + IVA | [registrocivil.gob.ec](https://www.registrocivil.gob.ec) |
 | **Security Data S.A.** | Privada | Archivo `.p12`, token USB, cert en la nube, HSM | 1-3 años | ~USD 28–60 + IVA | [securitydata.net.ec](https://www.securitydata.net.ec) |
 | **UANATACA Ecuador** | Privada | Archivo `.p12`, certificado en la nube, eIDAS | 1-3 años | ~USD 20–50 + IVA | [uanataca.com](https://web.uanataca.com) |
@@ -53,7 +55,9 @@ Esto importa cuando firmas:
 | **Prime Core** | Privada | Archivo `.p12` | 1-2 años | Consultar | Buscar en ARCOTEL |
 | **WE-GO TERCER VINCULADO** | Privada | Archivo `.p12` | 1-2 años | Consultar | Buscar en ARCOTEL |
 
-> **Precios referenciales, no vinculantes.** Cada ECI publica sus tarifas en su sitio. ICERT-EC publica tarifa oficial; las demás varían según el plan y la vigencia. Consulta siempre con la ECI antes de pagar. **firmar.ec no cobra comisión por dirigirte a una ECI** — somos una herramienta de firma, no un intermediario.
+</div>
+
+> **Precios referenciales, no vinculantes.** La tarifa de ICERT-EC en archivo se consultó el 16 de septiembre de 2026 e incluye IVA. Los demás rangos de esta tabla son referencias anteriores que debes confirmar con cada proveedor. Para comparar cifras con fuente y fecha, consulta [precios de certificados](/precios/). firmar.ec también comercializa certificados de Uanataca · Namirial en su tienda, como se explica más abajo.
 
 ## Cómo elegir tu ECI
 
@@ -92,12 +96,12 @@ Esta comparativa es independiente y no reordena nada por interés propio, pero
 conviene decirlo: también vendemos certificados. En
 [tienda.firmar.ec](https://tienda.firmar.ec/precios?utm_source=landing&utm_medium=comparativa) se emiten
 certificados `.p12` de UANATACA · Namirial 100% en línea, y el precio publicado
-**ya incluye IVA** (USD 23,60 el de 1 año), a diferencia de la tabla de arriba,
-que recoge tarifas antes de impuestos tal como las publica cada ECI.
+**ya incluye IVA** (USD 23,60 el de 1 año). La tabla de arriba identifica
+expresamente la base de impuestos de cada fila.
 
-### Si quieres el **precio más bajo verificable**
+### Si quieres comparar **precios publicados**
 
-A 2026, las opciones más económicas con tarifa pública son **ICERT-EC** (USD 19,80 + IVA, tarifa oficial) y los planes básicos de **ArgosData / UANATACA / Eclipsoft** (rango USD 16–25 + IVA). El BCE y Security Data suelen estar en rango medio (USD 25–35).
+La [tarifa oficial de ICERT-EC](https://www.icert.fje.gob.ec/tarifas-certificados/) para el certificado en archivo `.p12` es **USD 27,60 con IVA por dos años**, consultada el 16 de septiembre de 2026. Compara la misma modalidad, vigencia e impuestos; esta cifra por sí sola no permite afirmar qué proveedor es el más barato. Consulta la [tabla de precios con fuentes](/precios/).
 
 ## Compatibilidad con firmar.ec
 
