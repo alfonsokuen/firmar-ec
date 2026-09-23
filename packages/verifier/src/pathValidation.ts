@@ -33,10 +33,30 @@ export interface PathResult {
    * Always `false` when `success` is `true`.
    */
   chainIncomplete: boolean;
+  /**
+   * True when the chain is otherwise valid but the signer cert's keyUsage
+   * asserts neither digitalSignature nor nonRepudiation (not a signing cert).
+   * Always accompanied by `success: false`.
+   */
+  keyUsageNotSigning?: boolean;
+}
+
+/**
+ * Same certificate content: byte-equal TBSCertificate, the identity pkijs's
+ * own chain-engine dedup uses.
+ */
+function sameTbs(a: Certificate, b: Certificate): boolean {
+  const x = a.tbsView;
+  const y = b.tbsView;
+  if (x.byteLength !== y.byteLength) return false;
+  for (let i = 0; i < x.byteLength; i++) if (x[i] !== y[i]) return false;
+  return true;
 }
 
 /**
  * Walk from `leaf` upward through `pool` (candidate issuer certs) following
+ * issuer DNs — no signature checks, so it only ever picks the user-facing
+ * `chainIncomplete` MESSAGE and never a trust decision. Follows
  * issuer links until a self-signed certificate is reached, or the walk gets
  * stuck because no cert in `pool` matches the current issuer. Returns the
  * terminal self-signed certificate when reached, or `undefined` when the
@@ -112,9 +132,17 @@ export async function validatePath(
     };
   }
 
-  // Run pkijs chain validation
+  // pkijs 3.x builds the path from the LAST element of `certs`, after a dedup
+  // that keeps the FIRST copy of any duplicate (`leafCert =
+  // localCerts[localCerts.length - 1]` in CertificateChainValidationEngine).
+  // So the signer must go last and every other copy of it must be dropped
+  // first — with `[signerCert, ...intermediates]` pkijs validated whichever
+  // cert ended the pool, never the signer (2026-09-23: a leaf self-issued
+  // under a real subCA's DN verified `valid`, and genuine multi-signature
+  // signers got `untrusted_root` when a sibling's leaf ended the pool).
+  const pool = intermediates.filter((c) => !sameTbs(c, signerCert));
   const engine = new CertificateChainValidationEngine({
-    certs: [signerCert, ...intermediates],
+    certs: [...pool, signerCert],
     trustedCerts,
     checkDate: atTime,
   });
@@ -132,54 +160,44 @@ export async function validatePath(
     // `chainIncomplete` only selects which MESSAGE to show (see the doc on
     // the field above) — it must never soften `status` in the caller, since
     // `intermediates` is attacker-controlled (embedded by the signer).
-    const pool = [...trustedCerts, ...intermediates];
-    const reachedSelfSigned = walkToSelfSigned(signerCert, pool) !== undefined;
+    const reachedSelfSigned =
+      walkToSelfSigned(signerCert, [...trustedCerts, ...pool]) !== undefined;
     return { success: false, chain: [], error, warnings, chainIncomplete: !reachedSelfSigned };
   }
 
-  // v0.7.21 — Do NOT trust pkijs's `result.certificatePath` ordering for the
-  // matched-root lookup. In multi-sig PDFs we feed pkijs a large pool of certs
-  // (leaves + intermediates + roots from every sibling signature). pkijs's
-  // engine returns the FIRST chain that verifies across `certs[]`, not
-  // necessarily the chain rooted at `signerCert`. Symptom: 4 iCert sigs got
-  // matchedRootSlug=argosdata and Alfonso's ArgosData sig got
-  // matchedRootSlug=judicatura — a symmetric swap.
-  //
-  // Robust approach: walk from signerCert.issuer upward through the pool until
-  // we hit a self-signed cert (root), then match THAT subject to a TSL root.
+  // Fail closed unless pkijs verified the path of THIS signer. This is the
+  // invariant the ordering above establishes; checking it guards against any
+  // future change in pkijs's leaf selection or dedup.
   const chain: Certificate[] = result.certificatePath ?? [];
-  let matchedRoot: TrustRoot | undefined;
-  const issuerPool: Certificate[] = [...trustedCerts, ...intermediates];
-  const selfSigned = walkToSelfSigned(signerCert, issuerPool);
-  if (selfSigned) {
-    for (const r of usableRoots) {
-      try {
-        const rootCert = pemToCert(r.pemContent);
-        if (rootCert.subject.isEqual(selfSigned.subject)) {
-          matchedRoot = r;
-          break;
-        }
-      } catch {
-        /* skip */
-      }
-    }
+  const pathLeaf = chain[0];
+  if (!pathLeaf || !sameTbs(pathLeaf, signerCert)) {
+    return {
+      success: false,
+      chain: [],
+      error: 'Chain engine validated a certificate other than the signer',
+      warnings,
+      chainIncomplete: false,
+    };
   }
 
+  // The matched root is the anchor pkijs cryptographically verified (the last
+  // cert of the verified path), not the result of a DN-only walk.
+  const anchor = chain[chain.length - 1];
+  const anchorIdx = anchor ? trustedCerts.findIndex((t) => sameTbs(t, anchor)) : -1;
+  const matchedRoot = anchorIdx >= 0 ? usableRoots[anchorIdx] : undefined;
   if (!matchedRoot) {
     return {
       success: false,
       chain,
       error: 'Chain validated but no matching ARCOTEL root found',
       warnings,
-      // pkijs already reported the FULL chain as valid (`result.result`), so
-      // reaching this branch means a self-signed anchor WAS found but it
-      // doesn't match any usable TSL root — a known-but-untrusted root, not a
-      // missing link. Never soften this verdict.
       chainIncomplete: false,
     };
   }
 
-  // Check signer cert key usage — digitalSignature (bit 0) or nonRepudiation (bit 1)
+  // RFC 5280 §4.2.1.3: a document-signing cert must assert digitalSignature
+  // or nonRepudiation. A cert that declares keyUsage without either was not
+  // issued for signing — reject rather than warn.
   const ku = signerCert.extensions?.find((e) => e.extnID === '2.5.29.15');
   if (ku) {
     // parsedValue is typed loosely; access via any — pkijs typing limitation
@@ -188,7 +206,15 @@ export async function validatePath(
     const firstByte = kuBytes[0] ?? 0;
     // Bit 0 (MSB) = digitalSignature, Bit 1 = nonRepudiation
     if (!(firstByte & 0x80) && !(firstByte & 0x40)) {
-      warnings.push('Signer cert keyUsage does not include digitalSignature or nonRepudiation');
+      return {
+        success: false,
+        chain,
+        matchedRoot,
+        error: 'Signer cert keyUsage does not include digitalSignature or nonRepudiation',
+        warnings,
+        chainIncomplete: false,
+        keyUsageNotSigning: true,
+      };
     }
   }
 
@@ -208,8 +234,5 @@ export async function validatePath(
   void VerificationError; // imported for future direct throws
   void ERR_CHAIN_FAIL;
 
-  const successResult: PathResult = { success: true, chain, warnings, chainIncomplete: false };
-  // Conditional spread for exactOptionalPropertyTypes
-  if (matchedRoot !== undefined) successResult.matchedRoot = matchedRoot;
-  return successResult;
+  return { success: true, chain, matchedRoot, warnings, chainIncomplete: false };
 }

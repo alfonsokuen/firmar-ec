@@ -95,6 +95,8 @@ const summaryKey = $derived.by<UIKey>(() => {
   if (result.ocsp?.status === 'revoked') return 'verificar.invalid_summary_revoked';
   if (codes.has('CHAIN_INCOMPLETE_UNKNOWN_INTERMEDIATE'))
     return 'verificar.invalid_summary_chain_incomplete';
+  if (codes.has('key_usage_not_signing')) return 'verificar.invalid_summary_key_usage';
+  if (codes.has('signer_cert_not_valid')) return 'verificar.invalid_summary_cert_not_valid';
   if (codes.has('untrusted_root')) return 'verificar.invalid_summary_untrusted_root';
   // Fallback: signature value invalid (no specific warning code path).
   return 'verificar.invalid_summary_bad_signature';

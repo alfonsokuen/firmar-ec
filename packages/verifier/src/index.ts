@@ -1,6 +1,7 @@
 import {
   digest,
   ecCertIdentity,
+  isWithinValidity,
   issuerInfo,
   resolveIssuerCert,
   subjectInfo,
@@ -42,7 +43,7 @@ export type { CertCheckResult, CertCheckOptions } from './certCheck';
 
 // Bump on each release (kept hardcoded — JSON imports require resolveJsonModule
 // + downstream tsconfig coupling we'd rather avoid in this package).
-export const ENGINE_VERSION = '0.9.3';
+export const ENGINE_VERSION = '0.10.0';
 
 /**
  * Dedupe a certificate list by DER fingerprint. Used to merge intermediates
@@ -330,13 +331,35 @@ async function verifyOneSignature(
       ...bridging,
     ]);
     phase('chain');
-    // Validate the chain at SIGNING time, not "now": a cert that was valid when
-    // the document was signed must keep validating after it expires. Prefer the
-    // CMS signed signing-time; fall back to the PDF dict /M date (the only
-    // signing-time signal in legacy adbe.pkcs7.sha1 / no-signedAttrs profiles
-    // that carry no signed attributes); finally fall back to now.
-    const chainCheckTime = cms.signingTime ?? sig.signingTimeM ?? new Date();
-    const path = await validatePath(cms.signerCert, mergedIntermediates, roots, chainCheckTime);
+    // Validate the chain at the time the signature is PROVEN to exist: the
+    // time of a verified RFC 3161 timestamp, so a cert that was valid when the
+    // document was timestamped keeps validating after it expires. Without one,
+    // the CMS signing-time / PDF /M date are only the signer's word — trusting
+    // them let an expired cert with a backdated date verify as fully `valid`
+    // (2026-09-23). Then validate at the current time, and only if that fails
+    // fall back to the declared time, reported as `signing_time_unproven`.
+    const proofOfExistence =
+      tsaResult.valid && tsaResult.signingTime ? tsaResult.signingTime : undefined;
+    const declaredSigningTime = cms.signingTime ?? sig.signingTimeM;
+    let path = await validatePath(
+      cms.signerCert,
+      mergedIntermediates,
+      roots,
+      proofOfExistence ?? new Date(),
+    );
+    let signingTimeUnproven = false;
+    if (!path.success && !proofOfExistence && declaredSigningTime) {
+      const atDeclared = await validatePath(
+        cms.signerCert,
+        mergedIntermediates,
+        roots,
+        declaredSigningTime,
+      );
+      if (atDeclared.success) {
+        path = atDeclared;
+        signingTimeUnproven = true;
+      }
+    }
 
     // Detect "trust chain inconclusive due to placeholder TSL" — this is NOT a
     // crypto failure, just a missing trust anchor. We must NOT degrade to
@@ -348,10 +371,10 @@ async function verifyOneSignature(
     // even for a perfectly signed ECI/Security Data PDF. Treat that as
     // 'warning' with code TRUST_PLACEHOLDER (consumed by Verificar.svelte).
     //
-    // F6.7 (2026-05-10): granular state — some real PEMs landed (Eclipsoft,
-    // Uanataca). When path.success===false but a real root for the signer's
-    // issuer simply isn't in the TSL yet, we still flag as provisional but
-    // with a softer message ("partial demo: N de M ACEs faltan").
+    // 2026-09-23: the F6.7 "partial" softening (some roots placeholder →
+    // every chain failure became 'warning') was removed. It could not tell a
+    // missing placeholder root from a forged or unaccredited chain, so a
+    // single placeholder in the TSL would have softened every rejection.
     //
     // 2026-05-14: ACEs flagged isDefunct (ARCOTEL-listed but no operational
     // public presence) are excluded from the active denominator so the banner
@@ -359,9 +382,7 @@ async function verifyOneSignature(
     const activeRoots = roots.filter((r) => !r.isDefunct && !r.isParallelAnchor);
     const placeholderCount = activeRoots.filter((r) => r.isPlaceholder).length;
     const allRootsPlaceholder = activeRoots.length > 0 && placeholderCount === activeRoots.length;
-    const someRootsPlaceholder =
-      activeRoots.length > 0 && placeholderCount > 0 && placeholderCount < activeRoots.length;
-    const trustInconclusive = !path.success && (allRootsPlaceholder || someRootsPlaceholder);
+    const trustInconclusive = !path.success && allRootsPlaceholder;
 
     // OCSP (optional). Per ETSI EN 319 142-1, revocation status at verification
     // time is only REQUIRED for B-LT / B-LTA profiles (which embed it in DSS).
@@ -411,7 +432,14 @@ async function verifyOneSignature(
     let status: Status;
     if (!docCheck.matches) status = 'invalid';
     else if (!sigValid) status = 'invalid';
-    else if (!path.success && !trustInconclusive && path.chainIncomplete) {
+    else if (path.keyUsageNotSigning) {
+      status = 'invalid';
+      warnings.push({
+        code: 'key_usage_not_signing',
+        message:
+          'El certificado del firmante no está autorizado para firmar documentos: su uso de clave no incluye firma digital ni no repudio.',
+      });
+    } else if (!path.success && !trustInconclusive && path.chainIncomplete) {
       // SECURITY (2026-08-05 CRITICAL fix, was a BLOCK finding): the
       // leaf→root walk got stuck on a missing link. That link is chosen from
       // a pool that includes `intermediates` the SIGNER embedded in the
@@ -431,6 +459,20 @@ async function verifyOneSignature(
         message:
           'No pudimos completar la cadena de confianza de este certificado: puede faltar una autoridad certificadora intermedia que esta versión de firmar.ec todavía no reconoce, o el certificado no proviene de una entidad acreditada por ARCOTEL. Si crees que esto es un error, actualiza la aplicación.',
       });
+    } else if (
+      !path.success &&
+      !trustInconclusive &&
+      !isWithinValidity(cms.signerCert, proofOfExistence ?? new Date()) &&
+      !(declaredSigningTime && isWithinValidity(cms.signerCert, declaredSigningTime))
+    ) {
+      // Outside its validity both at the proven/current time and at the date
+      // the signer declared: say so, instead of blaming the issuer.
+      status = 'invalid';
+      warnings.push({
+        code: 'signer_cert_not_valid',
+        message:
+          'El certificado del firmante no estaba vigente en la fecha de la firma (caducado o todavía no emitido).',
+      });
     } else if (!path.success && !trustInconclusive) {
       status = 'invalid';
       warnings.push({
@@ -441,19 +483,11 @@ async function verifyOneSignature(
     } else if (ocsp?.status === 'revoked') status = 'invalid';
     else if (trustInconclusive) {
       status = 'warning';
-      if (allRootsPlaceholder) {
-        warnings.push({
-          code: 'TRUST_PLACEHOLDER',
-          message:
-            'ARCOTEL TSL roots are placeholders; cryptographic checks passed but the trust chain is provisional (not yet binding).',
-        });
-      } else {
-        const realCount = activeRoots.length - placeholderCount;
-        warnings.push({
-          code: 'TRUST_PARTIAL',
-          message: `Trust chain not yet established: ${realCount}/${activeRoots.length} ACEs ARCOTEL activas tienen raíz real; ${placeholderCount} aún placeholder. Cryptographic checks passed.`,
-        });
-      }
+      warnings.push({
+        code: 'TRUST_PLACEHOLDER',
+        message:
+          'ARCOTEL TSL roots are placeholders; cryptographic checks passed but the trust chain is provisional (not yet binding).',
+      });
     } else if (sig.hasIncrementalUpdates && isLatestSignature && !appendedBytesAreDocTimeStamp) {
       // Only flag for the LATEST signature — in multi-sig PDFs the "bytes after"
       // earlier signatures are subsequent legitimate signatures (PAdES
@@ -487,6 +521,15 @@ async function verifyOneSignature(
         code: 'weak_hash_sha1',
         message:
           'La firma usa SHA-1, un algoritmo de hash obsoleto y criptográficamente débil (no cumple los estándares actuales). La firma es verificable y el certificado encadena a una ACE acreditada por ARCOTEL, pero su robustez es limitada.',
+      });
+    }
+
+    if (signingTimeUnproven) {
+      if (status === 'valid') status = 'warning';
+      warnings.push({
+        code: 'signing_time_unproven',
+        message:
+          'El certificado del firmante ya no está vigente y la firma no tiene sello de tiempo: la fecha de firma la declara el propio firmante y no puede comprobarse. Solo es válida si realmente se firmó antes de que el certificado caducara.',
       });
     }
 
@@ -732,7 +775,9 @@ export async function verifyAllSignatures(
     for (const sig of sigs) {
       try {
         const cms = await parseCms(sig.contents);
-        allIntermediates.push(cms.signerCert, ...cms.intermediates);
+        // Only the CA certs a sibling embedded: another signer's leaf can never
+        // be an issuer here, it just adds noise to the chain pool.
+        allIntermediates.push(...cms.intermediates);
       } catch {
         // ignore — verifyOneSignature will surface the parse error per-sig
       }

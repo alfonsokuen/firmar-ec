@@ -52,6 +52,10 @@ export const ui = {
       'No pudimos completar la cadena de confianza de este certificado: puede faltar una autoridad certificadora intermedia que esta versión de firmar.ec todavía no reconoce, o el certificado no proviene de una entidad acreditada por ARCOTEL. Si crees que esto es un error, actualiza la aplicación.',
     'verificar.invalid_summary_revoked':
       'El certificado del firmante fue revocado por la ACE emisora antes o en el momento de la firma.',
+    'verificar.invalid_summary_key_usage':
+      'El certificado del firmante no está autorizado para firmar documentos: su uso de clave no incluye firma digital ni no repudio.',
+    'verificar.invalid_summary_cert_not_valid':
+      'El certificado del firmante no estaba vigente en la fecha de la firma (caducado o todavía no emitido).',
     'verificar.invalid_summary_hash_mismatch':
       'El hash del documento no coincide con el de la firma — el contenido del PDF fue alterado tras firmar.',
     'verificar.invalid_summary_bad_signature':
@@ -891,6 +895,10 @@ export const ui = {
       "We could not complete this certificate's trust chain: an intermediate certificate authority that this version of firmar.ec does not recognize yet may be missing, or the certificate may not come from an ARCOTEL-accredited entity. If you believe this is an error, update the app.",
     'verificar.invalid_summary_revoked':
       "The signer's certificate was revoked by the issuing CA before or at the time of signing.",
+    'verificar.invalid_summary_key_usage':
+      "The signer's certificate is not authorized to sign documents: its key usage includes neither digital signature nor non-repudiation.",
+    'verificar.invalid_summary_cert_not_valid':
+      "The signer's certificate was not valid on the signing date (expired or not yet issued).",
     'verificar.invalid_summary_hash_mismatch':
       'The document hash does not match the one in the signature — the PDF content was altered after signing.',
     'verificar.invalid_summary_bad_signature':

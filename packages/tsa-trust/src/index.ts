@@ -212,7 +212,17 @@ export async function validateTsaCertChain(
   // already trusted. Extra non-matching certs are harmless — the engine
   // finds its own path through the pool, exactly as it already does for
   // `intermediates`.
-  const certPool = [...intermediates, ...getTsaTrustIntermediates(), tsaCert.certificate];
+  // pkijs builds the path from the LAST cert of `certs` after a dedup that
+  // keeps the FIRST copy of a duplicate, so any earlier copy of the TSA cert
+  // (a token that lists its own leaf twice) would push a different cert into
+  // the leaf slot. Drop those copies so the TSA cert is the one validated.
+  const tsaTbs = tsaCert.certificate.tbsView;
+  const isTsaCert = (c: Certificate): boolean =>
+    c.tbsView.byteLength === tsaTbs.byteLength && c.tbsView.every((b, i) => b === tsaTbs[i]);
+  const certPool = [
+    ...[...intermediates, ...getTsaTrustIntermediates()].filter((c) => !isTsaCert(c)),
+    tsaCert.certificate,
+  ];
 
   try {
     const engine = new CertificateChainValidationEngine({

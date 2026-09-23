@@ -289,10 +289,15 @@ export async function checkCertificate(
   let revocation: RevocationOutcome = { status: 'unchecked' };
   if (opts.checkRevocation) {
     const leafParsed = toLtvParsedCert(cert, certDer);
+    // Resolve the issuer by AKI/SKI + signature, not by CN: renewed subCAs
+    // share their CN (BCE 2011/2019), and the wrong one yields an OCSP CertID
+    // / CRL check against a key that never issued this cert.
+    const issuerCert = await resolveIssuerCert(cert, intermediates);
+    const issuerIdx = issuerCert ? intermediates.indexOf(issuerCert) : -1;
     const issuerParsed =
-      intermediates
-        .map((c, i) => toLtvParsedCert(c, intermediateDers[i]!))
-        .find((c) => c.subjectCN !== null && c.subjectCN === leafParsed.issuerCN) ?? null;
+      issuerIdx >= 0
+        ? toLtvParsedCert(intermediates[issuerIdx]!, intermediateDers[issuerIdx]!)
+        : null;
     revocation = await checkRevocationLive(leafParsed, issuerParsed, opts);
     if (revocation.status === 'revoked') warnings.push('cert_revoked');
     else if (revocation.status === 'unknown') {

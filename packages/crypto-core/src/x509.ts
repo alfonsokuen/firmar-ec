@@ -1,5 +1,5 @@
 import { fromBER } from 'asn1js';
-import { Certificate, CertificateChainValidationEngine } from 'pkijs';
+import { Certificate } from 'pkijs';
 import { oidName } from './oids';
 
 export function parseCertificateDer(der: Uint8Array): Certificate {
@@ -256,41 +256,4 @@ export async function resolveIssuerCert(
     if (byAki.length > 1) return resolveByCryptographicVerification(child, byAki);
   }
   return resolveByCryptographicVerification(child, dnMatches);
-}
-
-export interface ChainValidationResult {
-  success: boolean;
-  chain: Certificate[];
-  rootMatched?: Certificate | undefined;
-  error?: string | undefined;
-}
-
-/** Validate `signerCert` against `trustedCerts` using `intermediateCerts` as helpers.
- *  Returns the full chain when successful. */
-export async function validateChain(
-  signerCert: Certificate,
-  intermediateCerts: Certificate[],
-  trustedCerts: Certificate[],
-): Promise<ChainValidationResult> {
-  const engine = new CertificateChainValidationEngine({
-    certs: [signerCert, ...intermediateCerts],
-    trustedCerts,
-  });
-  const result = await engine.verify();
-  if (result.result) {
-    const path = result.certificatePath as Certificate[] | undefined;
-    const lastInPath = path?.[path.length - 1];
-    // pkijs typing limitation — certificatePath is typed loosely
-    const rootMatched = lastInPath
-      ? trustedCerts.find((t) => t.issuer.isEqual((lastInPath as unknown as Certificate).issuer))
-      : undefined;
-    const result2: ChainValidationResult = { success: true, chain: path ?? [] };
-    if (rootMatched !== undefined) result2.rootMatched = rootMatched;
-    return result2;
-  }
-  return {
-    success: false,
-    chain: [],
-    error: result.resultMessage ?? 'unknown chain validation failure',
-  };
 }

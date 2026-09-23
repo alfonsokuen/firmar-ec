@@ -5,6 +5,42 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Verificador — motor 0.10.0 (`@firma-ec/verifier` 1.2.0, `@firma-ec/tsa-trust` 0.8.1) — 2026-09-23
+
+#### Security
+- **La validación de cadena comprobaba un certificado distinto del firmante.** El motor de cadenas de
+  pkijs toma como hoja el *último* certificado de la lista, y el verificador ponía al firmante el
+  *primero*: se validaba la cadena de la última intermedia del pool y la raíz se asignaba comparando
+  solo nombres. Consecuencia: un certificado cuya firma de emisión no verificaba podía salir como
+  válido bajo una ACE acreditada, tanto en «Verificar firma» como en «Validar certificado». Ahora el
+  firmante va al final (sin copias previas), hay una guarda que falla cerrado si la ruta verificada no
+  empieza en el firmante y la ACE se toma del ancla que pkijs verificó. Presente desde la primera
+  versión de `pathValidation.ts`.
+- **La fecha de firma declarada por el firmante ya no basta para validar un certificado caducado.**
+  La cadena se valida a la hora de un sello de tiempo RFC 3161 verificado o, si no lo hay, a la hora
+  actual. Si solo es válida en la fecha que declara el firmante, la firma pasa a *advertencia*
+  (`signing_time_unproven`) en lugar de *válida*.
+- Un certificado sin uso de clave de firma (`digitalSignature`/`nonRepudiation`) se rechaza
+  (`key_usage_not_signing`) en lugar de generar solo un aviso.
+- Se retira la degradación a advertencia por «raíces parcialmente placeholder» (`TRUST_PARTIAL`):
+  bastaba una raíz placeholder activa para que cualquier cadena rechazada, incluida una falsificada,
+  pasara a advertencia. `TRUST_PLACEHOLDER` (todas las raíces placeholder) no cambia.
+
+#### Fixed
+- **Multifirma: una firma legítima salía «Firma inválida — emisor no reconocido».** Caso real: PDF con
+  una firma de UANATACA CA2 2016 y otra de UANATACA CA2 2021; la hoja de la otra firma quedaba última
+  en el pool y el motor validaba la cadena equivocada. Ahora ambas salen válidas.
+- **Sellos de tiempo de MINTEL TSU02 marcados como no válidos.** Su emisora, UANATACA CA2 2021, no
+  estaba en el bundle de intermedias de TSA (solo CA1 2021).
+- El emisor usado para OCSP/CRL en «Validar certificado» se resuelve por AKI/SKI y firma, no por CN.
+- OCSP recibe como emisor la CA emisora real (antes podía recibir la raíz).
+- Nuevos resúmenes en la PWA para `key_usage_not_signing` y `signer_cert_not_valid` (certificado no
+  vigente en la fecha de la firma), en lugar de atribuirlos a una firma criptográfica incorrecta o a
+  un emisor no reconocido.
+
+#### Removed
+- `validateChain` de `@firma-ec/crypto-core`: sin llamadores y con el mismo defecto de orden.
+
 ### PWA 0.27.0 / signer 0.12.0 — 2026-09-14
 - El QR de las nuevas firmas visibles también se puede pulsar para abrir el verificador de firmar.ec. El receptor selecciona el PDF y la validación sigue siendo local. Disponible en firma única y multifirma, con la zona pulsable ajustada a la rotación de la página. El enlace se incorpora antes de firmar; los PDF ya emitidos no cambian.
 
