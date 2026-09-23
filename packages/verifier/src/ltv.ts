@@ -193,7 +193,7 @@ async function tryParseOcsp(
  * (`certIdHashAlgo`) — an unrecognized algorithm can't be corroborated, so it
  * is treated as a non-match rather than skipping the check.
  */
-async function ocspMatchesCert(
+export async function ocspMatchesCert(
   parsed: ParsedOcspResponse,
   subject: Certificate,
   issuer: Certificate,
@@ -388,6 +388,7 @@ export async function verifyLtv(
     }
     const subject = chain[i]!;
     const issuer = chain[i + 1]!;
+    let linkRevoked = false;
     const issuerParsed = parseCert(issuer);
 
     // OCSP first (preferred).
@@ -420,16 +421,19 @@ export async function verifyLtv(
       if (!(await ocspMatchesCert(parsed, subject, issuer))) continue;
       if (parsed.certStatus === 'revoked') {
         revokedFound = true;
+        linkRevoked = true;
         if (i === 0) signerRevocation = revocationOf(parsed.revokedAt);
         errors.push(`cert_revoked: ${getCN(subject) ?? 'unknown'}`);
-      } else if (parsed.certStatus === 'good') {
-        retrospectiveValid = true;
+        break;
       }
-      break;
+      // A `good` entry does not end the search: the DSS order is chosen by
+      // whoever wrote the PDF, and a later entry may prove a revocation.
+      if (parsed.certStatus === 'good') retrospectiveValid = true;
     }
 
-    // CRL fallback.
-    if (!retrospectiveValid && !revokedFound) {
+    // CRLs are checked too unless a revocation is already proven — an OCSP
+    // `good` must not hide a CRL that lists the cert.
+    if (!linkRevoked) {
       for (const idx of crlIdx) {
         if (Date.now() - ltvStart > LTV_BUDGET_MS) {
           budgetTripped = true;
@@ -457,10 +461,9 @@ export async function verifyLtv(
           revokedFound = true;
           if (i === 0) signerRevocation = revocationOf(status.revokedAt);
           errors.push(`cert_revoked_crl: ${getCN(subject) ?? 'unknown'}`);
-        } else {
-          retrospectiveValid = true;
+          break;
         }
-        break;
+        retrospectiveValid = true;
       }
     }
   }

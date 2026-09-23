@@ -26,13 +26,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
   conservando una firma válida de la TSA. Ahora el sello debe casar con sus atributos firmados.
 - **OCSP en vivo autenticado.** La respuesta se valida con la firma del responder (emisora o delegado con
   `id-kp-OCSPSigning`), el `CertID` del certificado consultado y la vigencia (`thisUpdate`/`nextUpdate`).
-  Antes se leía la primera respuesta sin verificar nada.
+  Antes se leía la primera respuesta sin verificar nada. El `CertID` debe nombrar también al emisor
+  (`issuerKeyHash`), y una respuesta sin `nextUpdate` con `thisUpdate` de más de 7 días no se da por
+  vigente.
+- **Se lee la fecha real de revocación.** pkijs deja el `RevokedInfo` como nodo ASN.1 sin decodificar y
+  la fecha y el motivo se perdían; con la regla nueva eso habría invalidado firmas revocadas *después*
+  del sello.
 - **La revocación se compara con la hora probada de la firma.** Una revocación anterior o igual a la
   hora del sello (o a la actual, sin sello) invalida la firma (`cert_revoked`); una posterior la deja
   válida con aviso (`revoked_after_signing`). Sin fecha de revocación, se invalida.
 - **La evidencia de revocación embebida (DSS) decide el veredicto** cuando está autenticada (OCSP
   verificado o CRL firmada por la CA emisora); antes solo generaba un aviso y un firmante revocado podía
-  salir válido. Las CRL embebidas sin firma de la CA emisora ya no cuentan en ningún sentido.
+  salir válido. Las CRL embebidas sin firma de la CA emisora ya no cuentan en ningún sentido, y una
+  respuesta favorable ya no corta la búsqueda: el orden de la DSS lo elige quien escribe el PDF.
 - Un sello añadido después de que caducara el certificado ya no da «Firma inválida — emisor no
   reconocido»: se valida en la fecha declarada como `signing_time_unproven`.
 - Un certificado sin uso de clave de firma (`digitalSignature`/`nonRepudiation`) se rechaza

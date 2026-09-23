@@ -5,12 +5,18 @@ import {
 } from '@firma-ec/ltv-validation';
 import { OCSPRequest } from 'pkijs';
 import type { Certificate } from 'pkijs';
-import { serialHexOf, toLtvParsedCert } from './ltv';
+import { ocspMatchesCert, serialHexOf, toLtvParsedCert } from './ltv';
 import type { OcspStatus } from './result';
 
 const OCSP_PROXY_BASE = 'https://ocsp.firmar.ec';
 /** Tolerated clock skew between the responder and this device. */
 const OCSP_CLOCK_SKEW_MS = 5 * 60 * 1000;
+/**
+ * Oldest `thisUpdate` accepted when the responder gives no `nextUpdate`
+ * (RFC 6960 §3.2: it must be "sufficiently recent"). Without a bound, a
+ * replayed response from before a revocation would read `good` forever.
+ */
+const OCSP_MAX_AGE_WITHOUT_NEXT_UPDATE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Build an OCSPRequest for `subjectCert` issued by `issuerCert` using the pkijs createForCertificate API. */
 async function buildRequest(
@@ -110,8 +116,15 @@ export async function checkOcsp(
         reason: 'ocsp_signature_not_verified',
       };
     }
+    // The serial alone is not the cert: the CertID must also name its issuer.
+    if (!(await ocspMatchesCert(parsed, ctx.signerCert, ctx.issuerCert))) {
+      return { status: 'unknown', checkedAt, source: 'live', reason: 'ocsp_response_unusable' };
+    }
     const now = Date.now();
-    const stale = parsed.nextUpdate !== undefined && parsed.nextUpdate.getTime() < now;
+    const stale =
+      parsed.nextUpdate !== undefined
+        ? parsed.nextUpdate.getTime() < now
+        : parsed.thisUpdate.getTime() < now - OCSP_MAX_AGE_WITHOUT_NEXT_UPDATE_MS;
     const notYetValid = parsed.thisUpdate.getTime() > now + OCSP_CLOCK_SKEW_MS;
     if (stale || notYetValid) {
       return { status: 'unknown', checkedAt, source: 'live', reason: 'ocsp_response_not_current' };

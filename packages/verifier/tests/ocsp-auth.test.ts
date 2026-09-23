@@ -3,6 +3,7 @@ import * as asn1js from 'asn1js';
 import forge from 'node-forge';
 import * as pkijs from 'pkijs';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { verifyLtv } from '../src/ltv';
 import { checkOcsp } from '../src/ocsp';
 
 /**
@@ -70,18 +71,42 @@ async function makeCert(
   };
 }
 
-/** A BasicOCSPResponse saying `good` for `about`, signed by `signer`, wrapped in an OCSPResponse. */
-async function ocspGood(
+interface OcspOpts {
+  /** Revoked at this date (with CRLReason `affiliationChanged`); default `good`. */
+  revokedAt?: Date;
+  thisUpdate?: Date;
+  /** Build the CertID's issuer hashes from this cert instead of the real issuer. */
+  certIdIssuer?: pkijs.Certificate;
+}
+
+/** A BasicOCSPResponse about `about`, signed by `signer`, wrapped in an OCSPResponse. */
+async function ocspResponse(
   about: pkijs.Certificate,
   issuer: pkijs.Certificate,
   signer: Gen,
+  opts: OcspOpts = {},
 ): Promise<Uint8Array> {
   const certID = new pkijs.CertID();
-  await certID.createForCertificate(about, { hashAlgorithm: 'SHA-1', issuerCertificate: issuer });
+  await certID.createForCertificate(about, {
+    hashAlgorithm: 'SHA-1',
+    issuerCertificate: opts.certIdIssuer ?? issuer,
+  });
+  const certStatus = opts.revokedAt
+    ? new asn1js.Constructed({
+        idBlock: { tagClass: 3, tagNumber: 1 },
+        value: [
+          new asn1js.GeneralizedTime({ valueDate: opts.revokedAt }),
+          new asn1js.Constructed({
+            idBlock: { tagClass: 3, tagNumber: 0 },
+            value: [new asn1js.Enumerated({ value: 3 })],
+          }),
+        ],
+      })
+    : new asn1js.Primitive({ idBlock: { tagClass: 3, tagNumber: 0 }, lenBlockLength: 1 });
   const single = new pkijs.SingleResponse({
     certID,
-    certStatus: new asn1js.Primitive({ idBlock: { tagClass: 3, tagNumber: 0 }, lenBlockLength: 1 }),
-    thisUpdate: new Date(Date.now() - 60_000),
+    certStatus,
+    thisUpdate: opts.thisUpdate ?? new Date(Date.now() - 60_000),
   });
   const basic = new pkijs.BasicOCSPResponse();
   basic.tbsResponseData.responderID = issuer.subject;
@@ -112,7 +137,7 @@ const rogue = await makeCert('ROGUE RESPONDER', '99');
 
 describe('checkOcsp authenticates the live response', () => {
   test('genuine issuer-signed good response for this cert → good (control)', async () => {
-    serveOcsp(await ocspGood(signer.pkijsCert, ca.pkijsCert, ca));
+    serveOcsp(await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca));
     const r = await checkOcsp({
       signerCert: signer.pkijsCert,
       issuerCert: ca.pkijsCert,
@@ -122,7 +147,7 @@ describe('checkOcsp authenticates the live response', () => {
   });
 
   test('properly signed response about ANOTHER cert → not good', async () => {
-    serveOcsp(await ocspGood(other.pkijsCert, ca.pkijsCert, ca));
+    serveOcsp(await ocspResponse(other.pkijsCert, ca.pkijsCert, ca));
     const r = await checkOcsp({
       signerCert: signer.pkijsCert,
       issuerCert: ca.pkijsCert,
@@ -132,7 +157,7 @@ describe('checkOcsp authenticates the live response', () => {
   });
 
   test('response signed by a key that is not the issuer nor a delegated responder → not good', async () => {
-    serveOcsp(await ocspGood(signer.pkijsCert, ca.pkijsCert, rogue));
+    serveOcsp(await ocspResponse(signer.pkijsCert, ca.pkijsCert, rogue));
     const r = await checkOcsp({
       signerCert: signer.pkijsCert,
       issuerCert: ca.pkijsCert,
@@ -140,4 +165,64 @@ describe('checkOcsp authenticates the live response', () => {
     });
     expect(r.status).not.toBe('good');
   });
+});
+
+describe('checkOcsp reads what the responder actually said', () => {
+  test('revoked response carries its real revocation date and reason', async () => {
+    const revokedAt = new Date('2026-07-01T00:00:00Z');
+    serveOcsp(await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, { revokedAt }));
+    const r = await checkOcsp({
+      signerCert: signer.pkijsCert,
+      issuerCert: ca.pkijsCert,
+      acSlug: 'x',
+    });
+    expect(r.status).toBe('revoked');
+    expect(r.revokedAt).toBe(revokedAt.toISOString());
+    expect(r.reason).toBe('affiliationChanged');
+  });
+
+  test('old response without nextUpdate is not taken as current', async () => {
+    serveOcsp(
+      await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, {
+        thisUpdate: new Date('2021-01-01T00:00:00Z'),
+      }),
+    );
+    const r = await checkOcsp({
+      signerCert: signer.pkijsCert,
+      issuerCert: ca.pkijsCert,
+      acSlug: 'x',
+    });
+    expect(r.status).not.toBe('good');
+  });
+
+  test('response whose CertID names another issuer (same serial) → not good', async () => {
+    serveOcsp(
+      await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, { certIdIssuer: rogue.pkijsCert }),
+    );
+    const r = await checkOcsp({
+      signerCert: signer.pkijsCert,
+      issuerCert: ca.pkijsCert,
+      acSlug: 'x',
+    });
+    expect(r.status).not.toBe('good');
+  });
+});
+
+describe('embedded (DSS) OCSP evidence does not depend on its order', () => {
+  const revokedAt = new Date('2026-07-01T00:00:00Z');
+  for (const order of ['good-first', 'revoked-first'] as const) {
+    test(`${order}: an authenticated revocation of the signer is always reported, with its date`, async () => {
+      const good = await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca);
+      const revoked = await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, { revokedAt });
+      const ocsps = order === 'good-first' ? [good, revoked] : [revoked, good];
+      const ltv = await verifyLtv(
+        [signer.pkijsCert, ca.pkijsCert],
+        { certs: [], ocsps, crls: [], vri: {} },
+        new Uint8Array([1]),
+        new Uint8Array(0),
+      );
+      expect(ltv.signerRevocation?.revokedAt?.toISOString()).toBe(revokedAt.toISOString());
+      expect(ltv.retrospectiveValid).toBe(false);
+    });
+  }
 });

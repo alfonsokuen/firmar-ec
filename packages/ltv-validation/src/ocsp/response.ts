@@ -295,6 +295,29 @@ const CRL_REASONS = [
   'aACompromise',
 ];
 
+/**
+ * Decode RevokedInfo (RFC 6960 §4.2.1): `[1] IMPLICIT SEQUENCE { revocationTime
+ * GeneralizedTime, revocationReason [0] EXPLICIT CRLReason OPTIONAL }`. pkijs
+ * leaves certStatus as a raw asn1js node, so there is no `.revocationTime`
+ * property to read — the date has to come from the node's children.
+ */
+function readRevokedInfo(node: unknown): { revokedAt?: Date; revocationReason?: string } {
+  const children = (node as { valueBlock?: { value?: asn1js.AsnType[] } }).valueBlock?.value ?? [];
+  const out: { revokedAt?: Date; revocationReason?: string } = {};
+  const time = children[0];
+  if (time instanceof asn1js.GeneralizedTime) out.revokedAt = time.toDate();
+  const reasonWrap = children[1] as
+    | { idBlock?: { tagClass?: number; tagNumber?: number }; valueBlock?: { value?: unknown[] } }
+    | undefined;
+  if (reasonWrap?.idBlock?.tagClass === 3 && reasonWrap.idBlock.tagNumber === 0) {
+    const reason = reasonWrap.valueBlock?.value?.[0];
+    if (reason instanceof asn1js.Enumerated) {
+      out.revocationReason = CRL_REASONS[reason.valueBlock.valueDec] || 'unspecified';
+    }
+  }
+  return out;
+}
+
 function viewSingleResponse(single: pkijs.SingleResponse): SingleResponseView {
   const certID = single.certID;
   const issuerNameHashHex = bufToHex(
@@ -308,20 +331,14 @@ function viewSingleResponse(single: pkijs.SingleResponse): SingleResponseView {
   );
   const certIdHashAlgo = certIdHashAlgoFromOid(certID.hashAlgorithm.algorithmId);
 
-  const cs = single.certStatus as unknown as {
-    idBlock?: { tagNumber?: number };
-    revocationTime?: { value: Date };
-    revocationReason?: { valueBlock?: { valueDec?: number } };
-  };
+  const cs = single.certStatus as unknown as { idBlock?: { tagNumber?: number } };
   let certStatus: RevocationStatus = 'unknown';
   let revokedAt: Date | undefined;
   let revocationReason: string | undefined;
   if (cs.idBlock?.tagNumber === 0) certStatus = 'good';
   else if (cs.idBlock?.tagNumber === 1) {
     certStatus = 'revoked';
-    revokedAt = cs.revocationTime?.value;
-    const code = cs.revocationReason?.valueBlock?.valueDec;
-    if (code !== undefined) revocationReason = CRL_REASONS[code] || 'unspecified';
+    ({ revokedAt, revocationReason } = readRevokedInfo(single.certStatus));
   }
 
   return {
