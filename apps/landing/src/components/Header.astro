@@ -7,7 +7,7 @@ import ThemeToggle from './ThemeToggle.svelte';
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 const home = localizedUrl('home', lang);
-const buyUrl = storeLink('header');
+const buyUrl = storeLink('header', Astro.url.pathname);
 
 // Single source of truth for the nav links so desktop + mobile never drift.
 const navKeys = ['firmar', 'verificar', 'seguridad', 'faq', 'acerca', 'patrocinar'] as const;

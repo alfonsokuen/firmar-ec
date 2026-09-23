@@ -7,7 +7,7 @@ import IdkmanagerMark from './IdkmanagerMark.astro';
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 const year = new Date().getFullYear();
-const buyUrl = storeLink('footer');
+const buyUrl = storeLink('footer', Astro.url.pathname);
 ---
 <footer class="border-t border-ink-200 dark:border-ink-800 mt-16">
   <div class="container py-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-6">
