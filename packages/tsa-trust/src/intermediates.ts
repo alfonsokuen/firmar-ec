@@ -15,6 +15,7 @@
  */
 
 import uanatacaCa1_2021Pem from './intermediates/uanataca-ca1-2021.pem?raw';
+import uanatacaCa2_2021Pem from './intermediates/uanataca-ca2-2021.pem?raw';
 
 export interface TsaTrustIntermediate {
   /** Short machine-readable slug. */
@@ -38,6 +39,23 @@ export interface TsaTrustIntermediate {
 }
 
 export const TSA_INTERMEDIATES: readonly TsaTrustIntermediate[] = [
+  {
+    slug: 'uanataca-ca2-2021',
+    commonName: 'UANATACA CA2 2021',
+    rootSlug: 'uanataca',
+    orgName: 'UANATACA S.A.',
+    pemContent: uanatacaCa2_2021Pem,
+    fingerprintSha256: '15ceab339144d48d352eef1c227f4d2ef4fc1756dead602c22be32d52100e69a',
+    validFrom: '2021-06-03',
+    validUntil: '2034-06-03',
+    notes:
+      'Issuing CA of MINTEL\'s accredited TSA ("Sello de tiempo acreditado de MINTEL – ' +
+      'TSU02", EKU id-kp-timeStamping critical, AKI C5:E7:33:25…). Same cert, byte for ' +
+      "byte, as @firma-ec/tsl-ec's uanataca-ca2-2021.pem (which there issues signing " +
+      'certs). Real case 2026-09-23: a UANATACA-signed contract carried a leaf-only ' +
+      'MINTEL TSU02 token that failed with chain_invalid. openssl verify -purpose ' +
+      'timestampsign: TSU02 → this CA → UANATACA ROOT 2016 OK.',
+  },
   {
     slug: 'uanataca-ca1-2021',
     commonName: 'UANATACA CA1 2021',

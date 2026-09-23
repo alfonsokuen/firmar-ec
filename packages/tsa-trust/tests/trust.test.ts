@@ -24,6 +24,9 @@ const HAS_KAT = existsSync(FIXTURE_TSR);
 // for the forensic-extraction + AIA-refetch provenance of the bundled
 // UANATACA CA1 2021 intermediate this test exercises.
 const FIXTURE_UANATACA_TSU01 = resolve(__dirname, '__fixtures__/uanataca-tsu01-leaf.der');
+// Public TSA certificate of MINTEL's accredited timestamping unit (a service
+// cert, no personal data), issued by UANATACA CA2 2021.
+const FIXTURE_MINTEL_TSU02 = resolve(__dirname, '__fixtures__/mintel-tsu02-leaf.der');
 
 function derToCert(der: Uint8Array): ParsedCertLike {
   const ab = der.buffer.slice(der.byteOffset, der.byteOffset + der.byteLength) as ArrayBuffer;
@@ -103,6 +106,16 @@ describe('validateTsaCertChain', () => {
     // Empty array on purpose — mirrors the real token, which embeds only the
     // leaf. Before the 2026-08-06 fix this returned `chain_invalid`: the
     // package had no UANATACA root/intermediate at all.
+    const result = await validateTsaCertChain(tsaCert, []);
+    expect(result).toMatchObject({ ok: true });
+    expect(result.matchedRoot?.slug).toBe('uanataca');
+  });
+
+  it('validates the real MINTEL TSU02 leaf (issued by UANATACA CA2 2021) from a leaf-only token', async () => {
+    // Real case 2026-09-23: a UANATACA-signed contract carried a MINTEL TSU02
+    // timestamp and firmar.ec showed it as `timestamp_invalid (chain_invalid)`
+    // because only CA1 2021 was bundled for TSAs.
+    const tsaCert = derToCert(new Uint8Array(readFileSync(FIXTURE_MINTEL_TSU02)));
     const result = await validateTsaCertChain(tsaCert, []);
     expect(result).toMatchObject({ ok: true });
     expect(result.matchedRoot?.slug).toBe('uanataca');
