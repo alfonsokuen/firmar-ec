@@ -41,6 +41,63 @@ export interface PathResult {
   keyUsageNotSigning?: boolean;
 }
 
+const OID_BASIC_CONSTRAINTS = '2.5.29.19';
+const OID_KEY_USAGE = '2.5.29.15';
+
+function extensionOf(cert: Certificate, oid: string) {
+  return cert.extensions?.find((e) => e.extnID === oid);
+}
+
+/** basicConstraints cA=true and, when keyUsage is present, keyCertSign. */
+function isIssuingCa(cert: Certificate): boolean {
+  const bc = extensionOf(cert, OID_BASIC_CONSTRAINTS)?.parsedValue as { cA?: boolean } | undefined;
+  if (bc?.cA !== true) return false;
+  const ku = extensionOf(cert, OID_KEY_USAGE);
+  if (!ku) return true;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+  const bits = new Uint8Array((ku.parsedValue as any).valueBlock.valueHex as ArrayBuffer);
+  return ((bits[0] ?? 0) & 0x04) !== 0; // bit 5 = keyCertSign
+}
+
+/**
+ * A TSL root without basicConstraints (X.509 v1, e.g. "APPFIRMAS S.A. Root
+ * AC" 2025) is rejected by pkijs as a path anchor: it demands cA=true on every
+ * cert of the path, the anchor included, so every chain under such a root
+ * failed. For those roots only, a subordinate CA from the pool becomes the
+ * pkijs anchor — attributed to the root — when the root is valid at `atTime`
+ * and the subordinate is an issuing CA whose signature verifies with the
+ * pinned root's key. That signature check is what keeps a forged subordinate
+ * carrying the root's DN out; pkijs then validates the rest of the path.
+ */
+async function addDelegatedAnchors(
+  trustedCerts: Certificate[],
+  usableRoots: TrustRoot[],
+  pool: Certificate[],
+  atTime: Date,
+): Promise<void> {
+  const rootCount = trustedCerts.length;
+  for (let i = 0; i < rootCount; i++) {
+    const root = trustedCerts[i]!;
+    if (extensionOf(root, OID_BASIC_CONSTRAINTS)) continue;
+    if (!isWithinValidity(root, atTime)) continue;
+    for (const candidate of pool) {
+      if (!candidate.issuer.isEqual(root.subject) || candidate.subject.isEqual(root.subject))
+        continue;
+      if (!isIssuingCa(candidate)) continue;
+      if (trustedCerts.some((t) => sameTbs(t, candidate))) continue;
+      let signedByRoot = false;
+      try {
+        signedByRoot = await candidate.verify(root);
+      } catch {
+        signedByRoot = false;
+      }
+      if (!signedByRoot) continue;
+      trustedCerts.push(candidate);
+      usableRoots.push(usableRoots[i]!);
+    }
+  }
+}
+
 /**
  * Same certificate content: byte-equal TBSCertificate, the identity pkijs's
  * own chain-engine dedup uses.
@@ -117,6 +174,8 @@ export async function validatePath(
       warnings.push(`Failed to parse trust root ${r.slug}: ${(e as Error).message}`);
     }
   }
+
+  await addDelegatedAnchors(trustedCerts, usableRoots, intermediates, atTime);
 
   if (trustedCerts.length === 0) {
     const allPlaceholders = roots.length > 0 && roots.every((r) => r.isPlaceholder);

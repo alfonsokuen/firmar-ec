@@ -36,13 +36,17 @@ function makeCert(opts: {
   issuer?: Gen;
   forgeIssuerDnOnly?: boolean;
   keyUsage?: Record<string, boolean>;
+  /** X.509 v1: no extensions at all (APPFIRMAS S.A. Root AC 2025 is one). */
+  v1?: boolean;
+  notBefore?: Date;
+  notAfter?: Date;
 }): Gen {
   const keys = forge.pki.rsa.generateKeyPair(2048);
   const cert = forge.pki.createCertificate();
   cert.publicKey = keys.publicKey;
   cert.serialNumber = opts.serial;
-  cert.validity.notBefore = new Date(Date.now() - YEAR);
-  cert.validity.notAfter = new Date(Date.now() + 5 * YEAR);
+  cert.validity.notBefore = opts.notBefore ?? new Date(Date.now() - YEAR);
+  cert.validity.notAfter = opts.notAfter ?? new Date(Date.now() + 5 * YEAR);
   const attrs: forge.pki.CertificateField[] = [{ name: 'commonName', value: opts.cn }];
   cert.setSubject(attrs);
   cert.setIssuer(opts.issuer ? opts.issuer.cert.subject.attributes : attrs);
@@ -51,10 +55,12 @@ function makeCert(opts: {
     (opts.isCa
       ? { keyCertSign: true, cRLSign: true }
       : { digitalSignature: true, nonRepudiation: true });
-  cert.setExtensions([
-    { name: 'basicConstraints', cA: opts.isCa },
-    { name: 'keyUsage', ...ku },
-  ]);
+  if (opts.v1) (cert as unknown as { version: number }).version = 0;
+  else
+    cert.setExtensions([
+      { name: 'basicConstraints', cA: opts.isCa },
+      { name: 'keyUsage', ...ku },
+    ]);
   const signingKey =
     opts.issuer && !opts.forgeIssuerDnOnly ? opts.issuer.keys.privateKey : keys.privateKey;
   cert.sign(signingKey, forge.md.sha256.create());
@@ -185,5 +191,75 @@ describe('checkCertificate ("Validar certificado") validates the uploaded cert',
     });
     expect(r.trusted).toBe(true);
     expect(r.matchedAceSlug).toBe('synth');
+  });
+});
+
+describe('legacy X.509 v1 trust root (no extensions, e.g. APPFIRMAS S.A. Root AC 2025)', () => {
+  // pkijs requires basicConstraints cA=true on every cert of the path, the
+  // anchor included, so a v1 root rejected every chain under it.
+  const v1Root = makeCert({ cn: 'Legacy V1 Root', isCa: true, serial: '40', v1: true });
+  const v1Sub = makeCert({ cn: 'Legacy Sub CA', isCa: true, serial: '41', issuer: v1Root });
+  const v1Leaf = makeCert({ cn: 'LEGACY SIGNER', isCa: false, serial: '42', issuer: v1Sub });
+
+  test('v1 root → sub CA → signer validates and is attributed to the v1 root', async () => {
+    const r = await validatePath(
+      toPkijs(v1Leaf),
+      [toPkijs(v1Sub)],
+      [await asRoot('legacy', v1Root)],
+      new Date(),
+    );
+    expect(r.success, r.error).toBe(true);
+    expect(r.matchedRoot?.slug).toBe('legacy');
+    expect(sameCert(r.chain[0], v1Leaf)).toBe(true);
+  });
+
+  test('sub CA forged under the v1 root DN (own key) is not trusted', async () => {
+    const forgedSub = makeCert({
+      cn: 'Legacy Sub CA',
+      isCa: true,
+      serial: '43',
+      issuer: v1Root,
+      forgeIssuerDnOnly: true,
+    });
+    const leaf = makeCert({ cn: 'UNDER FORGED SUB', isCa: false, serial: '44', issuer: forgedSub });
+    const r = await validatePath(
+      toPkijs(leaf),
+      [toPkijs(forgedSub)],
+      [await asRoot('legacy', v1Root)],
+      new Date(),
+    );
+    expect(r.success).toBe(false);
+    expect(r.matchedRoot).toBeUndefined();
+  });
+
+  test('a non-CA cert signed by the v1 root cannot act as an anchor', async () => {
+    const notCa = makeCert({ cn: 'NOT A CA', isCa: false, serial: '45', issuer: v1Root });
+    const leaf = makeCert({ cn: 'UNDER NON-CA', isCa: false, serial: '46', issuer: notCa });
+    const r = await validatePath(
+      toPkijs(leaf),
+      [toPkijs(notCa)],
+      [await asRoot('legacy', v1Root)],
+      new Date(),
+    );
+    expect(r.success).toBe(false);
+  });
+
+  test('v1 root outside its validity at the check time → rejected', async () => {
+    const r = await validatePath(
+      toPkijs(v1Leaf),
+      [toPkijs(v1Sub)],
+      [await asRoot('legacy', v1Root)],
+      new Date(Date.now() + 20 * YEAR),
+    );
+    expect(r.success).toBe(false);
+  });
+
+  test('checkCertificate: leaf-only upload bridged by the bundled sub CA is trusted', async () => {
+    const r = await checkCertificate(v1Leaf.der, [], {
+      trustRoots: [await asRoot('legacy', v1Root)],
+      trustIntermediates: [await asIntermediate('legacy-sub', 'legacy', v1Sub)],
+    });
+    expect(r.trusted).toBe(true);
+    expect(r.matchedAceSlug).toBe('legacy');
   });
 });

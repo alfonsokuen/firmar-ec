@@ -52,6 +52,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
   pasara a advertencia. `TRUST_PLACEHOLDER` (todas las raíces placeholder) no cambia.
 
 #### Fixed
+- **APPFIRMAS 2025: todas sus firmas salían «Firma inválida».** Su raíz («APPFIRMAS S.A. Root AC», 2025)
+  es un certificado X.509 v1 sin extensiones y pkijs exige `CA:TRUE` a todo certificado de la ruta,
+  ancla incluida. Para raíces de la TSL sin `basicConstraints`, una CA subordinada del pool actúa como
+  ancla (atribuida a esa raíz) solo si la raíz está vigente y la subordinada es una CA emisora cuya firma
+  verifica con la clave de la raíz fijada; una subordinada forjada con el mismo nombre no entra.
 - **Multifirma: una firma legítima salía «Firma inválida — emisor no reconocido».** Caso real: PDF con
   una firma de UANATACA CA2 2016 y otra de UANATACA CA2 2021; la hoja de la otra firma quedaba última
   en el pool y el motor validaba la cadena equivocada. Ahora ambas salen válidas.
