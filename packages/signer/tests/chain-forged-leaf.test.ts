@@ -264,10 +264,30 @@ describe('chain validation checks the SIGNER, not the last pooled cert', () => {
     });
     expect(r.signatureCount).toBe(2);
     for (const s of r.signatures) {
-      expect(s.status, `${s.signer?.cert.subject.cn}: ${JSON.stringify(s.warnings)}`).not.toBe(
-        'invalid',
-      );
+      expect(s.status, `${s.signer?.cert.subject.cn}: ${JSON.stringify(s.warnings)}`).toBe('valid');
       expect(s.signer?.matchedRootSlug).toBe('synth-root');
+    }
+  });
+
+  it('multi-signature: leaf-only signer rescued ONLY by the intermediate its sibling embedded → both valid', async () => {
+    const { root, interA } = buildPki();
+    const leaf1 = leafUnder(interA, 'FIRMANTE SIN CADENA', '72');
+    const leaf2 = leafUnder(interA, 'FIRMANTE CON CADENA', '73');
+    const once = await sign(await minimalPdf(), leaf1, []);
+    const pfx2 = await parsePfx(p12(leaf2, [interA]), PIN);
+    const twice = await addIncrementalSignature(
+      once,
+      pfx2 as Parameters<typeof addIncrementalSignature>[1],
+      { ...NO_LTV, intermediateBundle: [], aiaFallback: null },
+    );
+    const r = await verifyAllSignatures(twice, {
+      trustRoots: [await asRoot('synth-root', root)],
+      trustIntermediates: [], // the sibling's CMS is the only source of interA
+      fetchOcsp: false,
+    });
+    expect(r.signatureCount).toBe(2);
+    for (const s of r.signatures) {
+      expect(s.status, `${s.signer?.cert.subject.cn}: ${JSON.stringify(s.warnings)}`).toBe('valid');
     }
   });
 });

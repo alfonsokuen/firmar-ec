@@ -50,6 +50,13 @@ export interface LtvSummary {
   embeddedCrlCount: number;
   /** True iff at least one cert in the chain had a retrospective `good`-or-equivalent status from embedded material. */
   retrospectiveValid: boolean;
+  /**
+   * Authenticated embedded evidence that the SIGNER cert (chain[0]) is revoked:
+   * an OCSP response whose signature and CertID verified, or a CRL signed by
+   * the signer's issuer. `revokedAt` is absent when the evidence gives no date.
+   * The caller decides the verdict against the signature's proven time.
+   */
+  signerRevocation?: { revokedAt?: Date };
   /** Document timestamp (B-LTA). Absent when no /Sig /ETSI.RFC3161 found. */
   documentTimestamp?: DocumentTimestampSummary;
   /** Free-form diagnostic strings — never block outer signature. */
@@ -73,7 +80,24 @@ function getCN(cert: Certificate): string | null {
   return null;
 }
 
-function toLtvParsedCert(cert: Certificate): LtvParsedCert {
+function revocationOf(revokedAt: Date | undefined): { revokedAt?: Date } {
+  return revokedAt !== undefined ? { revokedAt } : {};
+}
+
+/** True when `crl` names `issuer` as its issuer and carries a signature `issuer` made. */
+async function crlIssuedBy(
+  crl: pkijs.CertificateRevocationList,
+  issuer: Certificate,
+): Promise<boolean> {
+  if (!crl.issuer.isEqual(issuer.subject)) return false;
+  try {
+    return await crl.verify({ issuerCertificate: issuer });
+  } catch {
+    return false;
+  }
+}
+
+export function toLtvParsedCert(cert: Certificate): LtvParsedCert {
   const der = new Uint8Array(cert.toSchema().toBER(false));
   return {
     subjectCN: getCN(cert),
@@ -131,7 +155,7 @@ function bufToHexLocal(buf: ArrayBuffer | Uint8Array): string {
   return out;
 }
 
-function serialHexOf(cert: Certificate): string {
+export function serialHexOf(cert: Certificate): string {
   const serialBuf = (cert.serialNumber.valueBlock as { valueHex: ArrayBuffer }).valueHex;
   return bufToHexLocal(serialBuf);
 }
@@ -354,6 +378,8 @@ export async function verifyLtv(
   const ltvStart = Date.now();
   let budgetTripped = false;
 
+  let signerRevocation: LtvSummary['signerRevocation'];
+
   // We need pairs (subject, issuer) to verify OCSP signatures correctly.
   for (let i = 0; i < chain.length - 1; i++) {
     if (Date.now() - ltvStart > LTV_BUDGET_MS) {
@@ -394,6 +420,7 @@ export async function verifyLtv(
       if (!(await ocspMatchesCert(parsed, subject, issuer))) continue;
       if (parsed.certStatus === 'revoked') {
         revokedFound = true;
+        if (i === 0) signerRevocation = revocationOf(parsed.revokedAt);
         errors.push(`cert_revoked: ${getCN(subject) ?? 'unknown'}`);
       } else if (parsed.certStatus === 'good') {
         retrospectiveValid = true;
@@ -422,9 +449,13 @@ export async function verifyLtv(
         }
         const crl = parseCrlCached(idx, crlDer);
         if (!crl) continue;
+        // DSS material can be appended after signing by anyone: only a CRL the
+        // subject's issuer actually signed says anything about the subject.
+        if (!(await crlIssuedBy(crl, issuer))) continue;
         const status = isCertRevoked(parseCert(subject), crl);
         if (status.revoked) {
           revokedFound = true;
+          if (i === 0) signerRevocation = revocationOf(status.revokedAt);
           errors.push(`cert_revoked_crl: ${getCN(subject) ?? 'unknown'}`);
         } else {
           retrospectiveValid = true;
@@ -469,6 +500,7 @@ export async function verifyLtv(
     retrospectiveValid: retrospectiveValid && !revokedFound,
     errors,
   };
+  if (signerRevocation) result.signerRevocation = signerRevocation;
   if (documentTimestamp) result.documentTimestamp = documentTimestamp;
   return result;
 }

@@ -58,6 +58,8 @@ export interface ParsedOcspResponse {
   thisUpdate: Date;
   nextUpdate?: Date;
   revokedAt?: Date;
+  /** CRLReason name (RFC 5280 §5.3.1) of the selected revoked entry, when given. */
+  revocationReason?: string;
   signatureValid: boolean;
   /** Literal diagnostic constant for WHY signatureValid is false; never dynamic data. */
   signatureDetail?: string;
@@ -274,9 +276,24 @@ interface SingleResponseView {
   certIdHashAlgo: CertIdHashAlgo;
   certStatus: RevocationStatus;
   revokedAt: Date | undefined;
+  revocationReason: string | undefined;
   thisUpdate: Date;
   nextUpdate: Date | undefined;
 }
+
+const CRL_REASONS = [
+  'unspecified',
+  'keyCompromise',
+  'cACompromise',
+  'affiliationChanged',
+  'superseded',
+  'cessationOfOperation',
+  'certificateHold',
+  '',
+  'removeFromCRL',
+  'privilegeWithdrawn',
+  'aACompromise',
+];
 
 function viewSingleResponse(single: pkijs.SingleResponse): SingleResponseView {
   const certID = single.certID;
@@ -294,13 +311,17 @@ function viewSingleResponse(single: pkijs.SingleResponse): SingleResponseView {
   const cs = single.certStatus as unknown as {
     idBlock?: { tagNumber?: number };
     revocationTime?: { value: Date };
+    revocationReason?: { valueBlock?: { valueDec?: number } };
   };
   let certStatus: RevocationStatus = 'unknown';
   let revokedAt: Date | undefined;
+  let revocationReason: string | undefined;
   if (cs.idBlock?.tagNumber === 0) certStatus = 'good';
   else if (cs.idBlock?.tagNumber === 1) {
     certStatus = 'revoked';
     revokedAt = cs.revocationTime?.value;
+    const code = cs.revocationReason?.valueBlock?.valueDec;
+    if (code !== undefined) revocationReason = CRL_REASONS[code] || 'unspecified';
   }
 
   return {
@@ -311,6 +332,7 @@ function viewSingleResponse(single: pkijs.SingleResponse): SingleResponseView {
     certIdHashAlgo,
     certStatus,
     revokedAt,
+    revocationReason,
     thisUpdate: single.thisUpdate as Date,
     nextUpdate: single.nextUpdate as Date | undefined,
   };
@@ -451,6 +473,7 @@ export async function parseOcspResponse(
   };
   if (selected.nextUpdate !== undefined) result.nextUpdate = selected.nextUpdate;
   if (selected.revokedAt !== undefined) result.revokedAt = selected.revokedAt;
+  if (selected.revocationReason !== undefined) result.revocationReason = selected.revocationReason;
   if (signatureDetail !== undefined) result.signatureDetail = signatureDetail;
   return result;
 }

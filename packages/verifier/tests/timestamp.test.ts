@@ -81,6 +81,14 @@ const FIXTURE_META = resolve(
 );
 const HAS_KAT = existsSync(FIXTURE_TSR) && existsSync(FIXTURE_META);
 
+function indexOfBytes(haystack: Uint8Array, needle: Uint8Array): number {
+  outer: for (let i = 0; i + needle.length <= haystack.length; i++) {
+    for (let j = 0; j < needle.length; j++) if (haystack[i + j] !== needle[j]) continue outer;
+    return i;
+  }
+  return -1;
+}
+
 function loadKatToken(): Uint8Array {
   const tsrBytes = new Uint8Array(readFileSync(FIXTURE_TSR));
   const ab = tsrBytes.buffer.slice(
@@ -158,6 +166,32 @@ describe('verifyTimestamp — F6 Task 12', () => {
       const r = await verifyTimestamp(token, signerSig);
       expect(r.reason).not.toBe('sig_invalid');
       expect(r.badge).toBe('gold');
+    },
+  );
+
+  it.runIf(HAS_KAT)(
+    'rejects a token whose TSTInfo was altered without re-signing (genTime moved one day back)',
+    async () => {
+      // The TSA signs signedAttrs, which carry message-digest = hash(TSTInfo).
+      // Without checking that digest, TSTInfo (genTime, imprint) could be
+      // rewritten while the TSA signature still verified — and the verifier
+      // now uses the timestamp as proof of existence for chain validation.
+      const token = loadKatToken();
+      const meta = loadKatMeta();
+      const signerSig = new TextEncoder().encode(meta.plaintext);
+      const original = await verifyTimestamp(token, signerSig);
+      expect(original.valid).toBe(true);
+      const genTime = new TextEncoder().encode(
+        original.signingTime!.toISOString().replace(/[-:T]/g, '').slice(0, 10),
+      );
+      const at = indexOfBytes(token, genTime);
+      expect(at).toBeGreaterThan(-1);
+      const tampered = token.slice();
+      // Same-length edit of the day digit keeps the DER structure intact.
+      tampered[at + 7] = tampered[at + 7] === 0x30 ? 0x31 : tampered[at + 7]! - 1;
+      const r = await verifyTimestamp(tampered, signerSig);
+      expect(r.valid).toBe(false);
+      expect(r.badge).not.toBe('gold');
     },
   );
 

@@ -241,6 +241,18 @@ export async function validateTsaCertChain(
           'chain verify failed',
       };
     }
+    // Fail closed unless pkijs validated the TSA cert itself (same invariant
+    // as the verifier's validatePath): the ordering above guarantees it, this
+    // guards against any change in pkijs's leaf selection.
+    const pathLeaf = (verifyResult as unknown as { certificatePath?: Certificate[] })
+      .certificatePath?.[0];
+    if (!pathLeaf || !isTsaCert(pathLeaf)) {
+      return {
+        ok: false,
+        reason: 'chain_invalid',
+        detail: 'chain engine validated a certificate other than the TSA cert',
+      };
+    }
     // Find which root matched — walk the issuer chain through the pool by
     // DER-level RDN identity (`.isEqual`, same pattern as pathValidation.ts's
     // `walkToSelfSigned`), NOT by CN string comparison. A CN-string match is

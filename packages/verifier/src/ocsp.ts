@@ -1,9 +1,16 @@
-import { fromBER } from 'asn1js';
-import { BasicOCSPResponse, OCSPRequest, OCSPResponse } from 'pkijs';
+import {
+  OcspParseError,
+  type ParsedOcspResponse,
+  parseOcspResponse,
+} from '@firma-ec/ltv-validation';
+import { OCSPRequest } from 'pkijs';
 import type { Certificate } from 'pkijs';
+import { serialHexOf, toLtvParsedCert } from './ltv';
 import type { OcspStatus } from './result';
 
 const OCSP_PROXY_BASE = 'https://ocsp.firmar.ec';
+/** Tolerated clock skew between the responder and this device. */
+const OCSP_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 /** Build an OCSPRequest for `subjectCert` issued by `issuerCert` using the pkijs createForCertificate API. */
 async function buildRequest(
@@ -40,80 +47,6 @@ async function postViaProxy(
   if (!resp.ok) throw new Error(`OCSP proxy ${slug} returned ${resp.status}`);
   const ab = await resp.arrayBuffer();
   return new Uint8Array(ab);
-}
-
-function parseResponse(respBytes: Uint8Array): {
-  status: OcspStatus['status'];
-  revokedAt?: Date;
-  reason?: string;
-} {
-  const asn = fromBER(
-    respBytes.buffer.slice(
-      respBytes.byteOffset,
-      respBytes.byteOffset + respBytes.byteLength,
-    ) as ArrayBuffer,
-  );
-  if (asn.offset === -1) throw new Error('OCSP response ASN.1 decode failed');
-  const ocspResp = new OCSPResponse({ schema: asn.result });
-
-  const status = ocspResp.responseStatus.valueBlock.valueDec;
-  if (status !== 0) {
-    // 0 = successful
-    throw new Error(`OCSP responseStatus = ${status} (non-success)`);
-  }
-
-  const responseBytes = ocspResp.responseBytes;
-  if (!responseBytes) throw new Error('OCSP responseBytes missing');
-
-  if (responseBytes.responseType !== '1.3.6.1.5.5.7.48.1.1') {
-    throw new Error(`Unexpected OCSP responseType ${responseBytes.responseType}`);
-  }
-
-  const basicAsn = fromBER(responseBytes.response.valueBlock.valueHex as ArrayBuffer);
-  const basic = new BasicOCSPResponse({ schema: basicAsn.result });
-
-  const single = basic.tbsResponseData.responses[0];
-  if (!single) throw new Error('OCSP response has no SingleResponse entries');
-
-  // certStatus is typed `any` by pkijs — discriminate by ASN.1 tag number
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-  const certStatus = single.certStatus as any;
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  if (certStatus.idBlock?.tagNumber === 0) {
-    // good (0) — IMPLICIT NULL
-    return { status: 'good' };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  if (certStatus.idBlock?.tagNumber === 1) {
-    // revoked (1) — has revocationTime + optional revocationReason
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const revokedAt = certStatus.revocationTime?.value as Date | undefined;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const reasonCode = certStatus.revocationReason?.valueBlock?.valueDec as number | undefined;
-    const REASONS = [
-      'unspecified',
-      'keyCompromise',
-      'cACompromise',
-      'affiliationChanged',
-      'superseded',
-      'cessationOfOperation',
-      'certificateHold',
-      '',
-      'removeFromCRL',
-      'privilegeWithdrawn',
-      'aACompromise',
-    ];
-    const result: { status: OcspStatus['status']; revokedAt?: Date; reason?: string } = {
-      status: 'revoked',
-    };
-    if (revokedAt !== undefined) result.revokedAt = revokedAt;
-    if (reasonCode !== undefined) result.reason = REASONS[reasonCode] ?? 'unspecified';
-    return result;
-  }
-
-  return { status: 'unknown' };
 }
 
 export interface OcspContext {
@@ -154,14 +87,38 @@ export async function checkOcsp(
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
-    const parsed = parseResponse(respBytes);
-    const ocspResult: OcspStatus = {
-      status: parsed.status,
-      checkedAt,
-      source: 'live',
-    };
+    // Authenticated parse: responder signature (issuer or delegated with
+    // id-kp-OCSPSigning) and a SingleResponse whose CertID answers THIS cert.
+    // The previous parser read `responses[0]` unverified, so a response for
+    // another cert, stale or tampered, was taken at face value.
+    let parsed: ParsedOcspResponse;
+    try {
+      parsed = await parseOcspResponse(respBytes, toLtvParsedCert(ctx.issuerCert), {
+        serialHex: serialHexOf(ctx.signerCert),
+      });
+    } catch (e) {
+      if (e instanceof OcspParseError) {
+        return { status: 'unknown', checkedAt, source: 'live', reason: 'ocsp_response_unusable' };
+      }
+      throw e;
+    }
+    if (!parsed.signatureValid) {
+      return {
+        status: 'unknown',
+        checkedAt,
+        source: 'live',
+        reason: 'ocsp_signature_not_verified',
+      };
+    }
+    const now = Date.now();
+    const stale = parsed.nextUpdate !== undefined && parsed.nextUpdate.getTime() < now;
+    const notYetValid = parsed.thisUpdate.getTime() > now + OCSP_CLOCK_SKEW_MS;
+    if (stale || notYetValid) {
+      return { status: 'unknown', checkedAt, source: 'live', reason: 'ocsp_response_not_current' };
+    }
+    const ocspResult: OcspStatus = { status: parsed.certStatus, checkedAt, source: 'live' };
     if (parsed.revokedAt !== undefined) ocspResult.revokedAt = parsed.revokedAt.toISOString();
-    if (parsed.reason !== undefined) ocspResult.reason = parsed.reason;
+    if (parsed.revocationReason !== undefined) ocspResult.reason = parsed.revocationReason;
     return ocspResult;
   } catch (e) {
     return {

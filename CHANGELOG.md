@@ -5,7 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
-### Verificador — motor 0.10.0 (`@firma-ec/verifier` 1.2.0, `@firma-ec/tsa-trust` 0.8.1) — 2026-09-23
+### Verificador — motor 0.10.0 (`@firma-ec/verifier` 1.2.0, `@firma-ec/tsa-trust` 0.8.1, `@firma-ec/tsa-client` y `@firma-ec/ltv-validation` con cambios compatibles) — 2026-09-23
 
 #### Security
 - **La validación de cadena comprobaba un certificado distinto del firmante.** El motor de cadenas de
@@ -20,6 +20,21 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
   La cadena se valida a la hora de un sello de tiempo RFC 3161 verificado o, si no lo hay, a la hora
   actual. Si solo es válida en la fecha que declara el firmante, la firma pasa a *advertencia*
   (`signing_time_unproven`) en lugar de *válida*.
+- **Sellos de tiempo manipulables.** La firma de la TSA cubre los atributos firmados, no el `TSTInfo`;
+  faltaba comprobar que el atributo `message-digest` coincide con el hash del `TSTInfo` (y que
+  `content-type` es `TSTInfo`). Sin eso, la fecha y la huella de un sello real podían reescribirse
+  conservando una firma válida de la TSA. Ahora el sello debe casar con sus atributos firmados.
+- **OCSP en vivo autenticado.** La respuesta se valida con la firma del responder (emisora o delegado con
+  `id-kp-OCSPSigning`), el `CertID` del certificado consultado y la vigencia (`thisUpdate`/`nextUpdate`).
+  Antes se leía la primera respuesta sin verificar nada.
+- **La revocación se compara con la hora probada de la firma.** Una revocación anterior o igual a la
+  hora del sello (o a la actual, sin sello) invalida la firma (`cert_revoked`); una posterior la deja
+  válida con aviso (`revoked_after_signing`). Sin fecha de revocación, se invalida.
+- **La evidencia de revocación embebida (DSS) decide el veredicto** cuando está autenticada (OCSP
+  verificado o CRL firmada por la CA emisora); antes solo generaba un aviso y un firmante revocado podía
+  salir válido. Las CRL embebidas sin firma de la CA emisora ya no cuentan en ningún sentido.
+- Un sello añadido después de que caducara el certificado ya no da «Firma inválida — emisor no
+  reconocido»: se valida en la fecha declarada como `signing_time_unproven`.
 - Un certificado sin uso de clave de firma (`digitalSignature`/`nonRepudiation`) se rechaza
   (`key_usage_not_signing`) en lugar de generar solo un aviso.
 - Se retira la degradación a advertencia por «raíces parcialmente placeholder» (`TRUST_PARTIAL`):
@@ -34,6 +49,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
   estaba en el bundle de intermedias de TSA (solo CA1 2021).
 - El emisor usado para OCSP/CRL en «Validar certificado» se resuelve por AKI/SKI y firma, no por CN.
 - OCSP recibe como emisor la CA emisora real (antes podía recibir la raíz).
+- La PWA muestra «Fecha de firma no demostrada» para `signing_time_unproven` en lugar de «Firma válida
+  con advertencias», y el resumen de revocación sale del código `cert_revoked`, no del estado OCSP.
 - Nuevos resúmenes en la PWA para `key_usage_not_signing` y `signer_cert_not_valid` (certificado no
   vigente en la fecha de la firma), en lugar de atribuirlos a una firma criptográfica incorrecta o a
   un emisor no reconocido.

@@ -140,6 +140,8 @@ function getIssuerCN(cert: Certificate): string | null {
   );
 }
 
+const OID_ID_CT_TST_INFO = '1.2.840.113549.1.9.16.1.4';
+
 /**
  * Verify the TSA's inner SignerInfo signature over its signedAttrs DER.
  *
@@ -153,6 +155,15 @@ async function verifyInnerSignature(
 ): Promise<boolean> {
   const hash = HASH_OID_TO_ALGO[parsed.innerDigestAlgoOid];
   if (!hash) return false;
+
+  // The TSA signs signedAttrs, not TSTInfo: TSTInfo is bound only through the
+  // mandatory content-type and message-digest attributes (RFC 5652 §5.3/§11).
+  // Without this check genTime and the imprint could be rewritten while the
+  // signature below still verified (2026-09-23, reproduced on the FreeTSA KAT).
+  if (parsed.innerContentTypeOid !== OID_ID_CT_TST_INFO) return false;
+  if (!parsed.innerMessageDigest) return false;
+  const tstDigest = new Uint8Array(await crypto.subtle.digest(hash, toAb(parsed.tstInfoDer)));
+  if (!bytesEqual(tstDigest, parsed.innerMessageDigest)) return false;
 
   // Export pubkey from TSA cert.
   const spkiRaw = new Uint8Array(tsaCert.subjectPublicKeyInfo.toSchema().toBER(false));

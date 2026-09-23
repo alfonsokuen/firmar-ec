@@ -347,8 +347,15 @@ async function verifyOneSignature(
       roots,
       proofOfExistence ?? new Date(),
     );
+    // A timestamp only proves the signature existed AT THE LATEST at its
+    // time, so a declared date before it is retried too (a timestamp added
+    // after the cert expired): valid then, but still only on the signer's word.
     let signingTimeUnproven = false;
-    if (!path.success && !proofOfExistence && declaredSigningTime) {
+    if (
+      !path.success &&
+      declaredSigningTime &&
+      (!proofOfExistence || declaredSigningTime.getTime() < proofOfExistence.getTime())
+    ) {
       const atDeclared = await validatePath(
         cms.signerCert,
         mergedIntermediates,
@@ -429,6 +436,17 @@ async function verifyOneSignature(
     // by usable real roots) are also 'invalid'. But chain failures caused
     // SOLELY by all roots being placeholders are 'warning' — the PWA renders
     // a DEMO banner explaining the trust anchor is provisional.
+    // A revocation only defeats the signature if it happened at or before the
+    // time the signature is proven to exist (verified timestamp, else now).
+    // A later revocation (e.g. the holder left the company) leaves a properly
+    // timestamped signature valid. No revocation date → fail closed.
+    const revocationCutoff = proofOfExistence ?? new Date();
+    const revokedBeforeProof = (at: Date | undefined): boolean =>
+      at === undefined || at.getTime() <= revocationCutoff.getTime();
+    const liveRevokedAt =
+      ocsp?.status === 'revoked' && ocsp.revokedAt ? new Date(ocsp.revokedAt) : undefined;
+    let revokedAfterSigning = ocsp?.status === 'revoked' && !revokedBeforeProof(liveRevokedAt);
+
     let status: Status;
     if (!docCheck.matches) status = 'invalid';
     else if (!sigValid) status = 'invalid';
@@ -480,8 +498,14 @@ async function verifyOneSignature(
         message:
           'El certificado del firmante no encadena con ninguna ACE acreditada por ARCOTEL en la TSL-EC. La firma es criptográficamente correcta pero no proviene de un emisor reconocido en Ecuador.',
       });
-    } else if (ocsp?.status === 'revoked') status = 'invalid';
-    else if (trustInconclusive) {
+    } else if (ocsp?.status === 'revoked' && revokedBeforeProof(liveRevokedAt)) {
+      status = 'invalid';
+      warnings.push({
+        code: 'cert_revoked',
+        message:
+          'El certificado del firmante fue revocado por la ACE emisora antes o en el momento de la firma.',
+      });
+    } else if (trustInconclusive) {
       status = 'warning';
       warnings.push({
         code: 'TRUST_PLACEHOLDER',
@@ -529,7 +553,7 @@ async function verifyOneSignature(
       warnings.push({
         code: 'signing_time_unproven',
         message:
-          'El certificado del firmante ya no está vigente y la firma no tiene sello de tiempo: la fecha de firma la declara el propio firmante y no puede comprobarse. Solo es válida si realmente se firmó antes de que el certificado caducara.',
+          'La cadena de certificados no es válida hoy y ningún sello de tiempo válido prueba cuándo se firmó: solo se valida en la fecha que declara el propio firmante, que no puede comprobarse. Es válida únicamente si de verdad se firmó en esa fecha.',
       });
     }
 
@@ -578,6 +602,31 @@ async function verifyOneSignature(
         }, 12_000),
       ),
     ]);
+    // Embedded (DSS) revocation evidence, authenticated inside verifyLtv, now
+    // affects the verdict too — before, it only produced an ltv_warning and a
+    // revoked signer could still come out `valid`.
+    const embeddedRevocation = ltvSummary.signerRevocation;
+    if (embeddedRevocation && status !== 'invalid') {
+      if (revokedBeforeProof(embeddedRevocation.revokedAt)) {
+        status = 'invalid';
+        warnings.push({
+          code: 'cert_revoked',
+          message:
+            'El certificado del firmante fue revocado por la ACE emisora antes o en el momento de la firma.',
+        });
+      } else {
+        revokedAfterSigning = true;
+      }
+    }
+    if (revokedAfterSigning) {
+      if (status === 'valid') status = 'warning';
+      warnings.push({
+        code: 'revoked_after_signing',
+        message:
+          'El certificado del firmante fue revocado después de la fecha probada de la firma. La firma era válida cuando se selló.',
+      });
+    }
+
     for (const err of ltvSummary.errors) {
       warnings.push({ code: 'ltv_warning', message: err });
     }

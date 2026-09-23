@@ -41,6 +41,9 @@ export const ui = {
     'verificar.valid': 'Firma válida',
     'verificar.valid_summary': 'La firma es auténtica y el documento no ha sido modificado.',
     'verificar.warning': 'Firma válida con advertencias',
+    'verificar.warning_unproven_time': 'Fecha de firma no demostrada',
+    'verificar.warning_summary_unproven_time':
+      'La cadena de certificados no es válida hoy y ningún sello de tiempo prueba cuándo se firmó. Solo sería válida en la fecha que declara el propio firmante, que no puede comprobarse.',
     'verificar.warning_summary':
       'La firma es criptográficamente válida pero hay aspectos que debes revisar.',
     'verificar.invalid': 'Firma inválida',
@@ -884,6 +887,9 @@ export const ui = {
     'verificar.valid': 'Valid signature',
     'verificar.valid_summary': 'The signature is authentic and the document has not been modified.',
     'verificar.warning': 'Valid signature with warnings',
+    'verificar.warning_unproven_time': 'Signing date not proven',
+    'verificar.warning_summary_unproven_time':
+      'The certificate chain is not valid today and no timestamp proves when this was signed. It would only be valid on the date the signer declared, which cannot be checked.',
     'verificar.warning_summary':
       'The signature is cryptographically valid, but there are points you should review.',
     'verificar.invalid': 'Invalid signature',

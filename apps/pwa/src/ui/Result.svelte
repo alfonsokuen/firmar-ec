@@ -67,6 +67,13 @@ const VARIANTS: Record<VerificationResult['status'], Variant> = {
 
 const v = $derived(VARIANTS[result.status]);
 
+// A chain valid only at the signer-declared date is not "valid with minor
+// warnings": the date is the signer's word. Give it its own title.
+const signingTimeUnproven = $derived(
+  result.status === 'warning' && result.warnings.some((w) => w.code === 'signing_time_unproven'),
+);
+const titleKey = $derived<UIKey>(signingTimeUnproven ? 'verificar.warning_unproven_time' : v.title);
+
 /**
  * For 'invalid' status, pick a specific summary key based on which warning
  * the verifier surfaced. This avoids the misleading generic "documento
@@ -84,6 +91,7 @@ const v = $derived(VARIANTS[result.status]);
  */
 const summaryKey = $derived.by<UIKey>(() => {
   const codes = new Set(result.warnings.map((w) => w.code));
+  if (signingTimeUnproven) return 'verificar.warning_summary_unproven_time';
   if (result.status !== 'invalid') return v.summary;
   // Hash mismatch / bad signature are the only true integrity failures.
   // `integrity` is absent when verification threw (engine-error path in
@@ -92,7 +100,7 @@ const summaryKey = $derived.by<UIKey>(() => {
   // instead of being mislabeled "documento modificado".
   if (result.integrity && !result.integrity.digestMatches)
     return 'verificar.invalid_summary_hash_mismatch';
-  if (result.ocsp?.status === 'revoked') return 'verificar.invalid_summary_revoked';
+  if (codes.has('cert_revoked')) return 'verificar.invalid_summary_revoked';
   if (codes.has('CHAIN_INCOMPLETE_UNKNOWN_INTERMEDIATE'))
     return 'verificar.invalid_summary_chain_incomplete';
   if (codes.has('key_usage_not_signing')) return 'verificar.invalid_summary_key_usage';
@@ -116,7 +124,7 @@ const summaryKey = $derived.by<UIKey>(() => {
 
   <div class="flex-1 min-w-0">
     <h2 class="text-xl sm:text-2xl font-display font-semibold tracking-tight {v.iconText}">
-      {t(v.title)}
+      {t(titleKey)}
     </h2>
     <p class="mt-1 text-sm sm:text-base text-ink-600 dark:text-ink-300">
       {t(summaryKey)}

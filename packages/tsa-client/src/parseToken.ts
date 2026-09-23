@@ -28,6 +28,8 @@ import type { ParsedTimestampToken } from './types';
 // CMS OIDs
 const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';
 const OID_ID_CT_TST_INFO = '1.2.840.113549.1.9.16.1.4';
+const OID_CONTENT_TYPE = '1.2.840.113549.1.9.3';
+const OID_MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
 
 function getInnerArrayBuffer(u8: Uint8Array): ArrayBuffer {
   return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength) as ArrayBuffer;
@@ -191,6 +193,26 @@ export function parseTimestampToken(token: Uint8Array): ParsedTimestampToken {
   }
 
   // signatureValue OCTET STRING
+  // The signed attributes bind the signature to the TSTInfo only through
+  // message-digest = hash(eContent). Expose it so the verifier can check it;
+  // without that check TSTInfo (genTime, imprint) can be rewritten while the
+  // TSA's signature over signedAttrs still verifies.
+  let innerMessageDigest: Uint8Array | undefined;
+  let innerContentTypeOid: string | undefined;
+  const attrs = (
+    si as unknown as {
+      signedAttrs?: { attributes?: { type: string; values: asn1js.AsnType[] }[] };
+    }
+  ).signedAttrs?.attributes;
+  for (const a of attrs ?? []) {
+    const v = a.values[0];
+    if (a.type === OID_MESSAGE_DIGEST && v instanceof asn1js.OctetString) {
+      innerMessageDigest = bytesFromOctetString(v);
+    } else if (a.type === OID_CONTENT_TYPE && v instanceof asn1js.ObjectIdentifier) {
+      innerContentTypeOid = v.valueBlock.toString();
+    }
+  }
+
   const sigOs = (si as unknown as { signature: asn1js.OctetString }).signature;
   const innerSignatureValue = bytesFromOctetString(sigOs);
 
@@ -210,5 +232,8 @@ export function parseTimestampToken(token: Uint8Array): ParsedTimestampToken {
     innerSignatureValue,
     innerSigAlgoOid,
     innerDigestAlgoOid,
+    tstInfoDer: tstInfoBytes,
+    ...(innerMessageDigest !== undefined ? { innerMessageDigest } : {}),
+    ...(innerContentTypeOid !== undefined ? { innerContentTypeOid } : {}),
   };
 }

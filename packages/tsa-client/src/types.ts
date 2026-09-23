@@ -71,4 +71,10 @@ export interface ParsedTimestampToken {
   innerSignatureValue: Uint8Array;
   innerSigAlgoOid: string;
   innerDigestAlgoOid: string;
+  /** DER of the TSTInfo (the eContent the TSA's message-digest attribute covers). */
+  tstInfoDer: Uint8Array;
+  /** Value of the signed `message-digest` attribute (RFC 5652 §11.2), when present. */
+  innerMessageDigest?: Uint8Array;
+  /** Value of the signed `content-type` attribute (RFC 5652 §11.1), when present. */
+  innerContentTypeOid?: string;
 }
