@@ -80,8 +80,33 @@ function getCN(cert: Certificate): string | null {
   return null;
 }
 
-function revocationOf(revokedAt: Date | undefined): { revokedAt?: Date } {
-  return revokedAt !== undefined ? { revokedAt } : {};
+/**
+ * Merge a newly found revocation into what is already known, keeping the one
+ * that decides a verdict: the earliest date, and an undated revocation over
+ * any dated one (fail closed).
+ */
+function earlierRevocation(
+  known: { revokedAt?: Date } | undefined,
+  revokedAt: Date | undefined,
+): { revokedAt?: Date } {
+  if (known && known.revokedAt === undefined) return known;
+  if (revokedAt === undefined) return {};
+  if (known?.revokedAt && known.revokedAt <= revokedAt) return known;
+  return { revokedAt };
+}
+
+/** The issuer's public-key hash under each CertID algorithm (RFC 6960 §4.1.1). */
+export async function issuerKeyHashByAlgo(
+  issuer: Certificate,
+): Promise<{ sha1: string; sha256: string }> {
+  const spki = toAb(
+    new Uint8Array(issuer.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView),
+  );
+  const [sha1, sha256] = await Promise.all([
+    crypto.subtle.digest('SHA-1', spki),
+    crypto.subtle.digest('SHA-256', spki),
+  ]);
+  return { sha1: bufToHexLocal(sha1), sha256: bufToHexLocal(sha256) };
 }
 
 /** True when `crl` names `issuer` as its issuer and carries a signature `issuer` made. */
@@ -172,9 +197,13 @@ async function tryParseOcsp(
   der: Uint8Array,
   issuerParsed: LtvParsedCert,
   subject: Certificate,
+  issuer: Certificate,
 ): Promise<ParsedOcspResponse | null> {
   try {
-    return await parseOcspResponse(der, issuerParsed, { serialHex: serialHexOf(subject) });
+    return await parseOcspResponse(der, issuerParsed, {
+      serialHex: serialHexOf(subject),
+      issuerKeyHashByAlgo: await issuerKeyHashByAlgo(issuer),
+    });
   } catch (e) {
     if (e instanceof OcspParseError) return null;
     return null;
@@ -410,7 +439,7 @@ export async function verifyLtv(
       if (ocspCache.has(ocspKey)) {
         parsed = ocspCache.get(ocspKey) ?? null;
       } else {
-        parsed = await tryParseOcsp(ocspDer, issuerParsed, subject);
+        parsed = await tryParseOcsp(ocspDer, issuerParsed, subject, issuer);
         ocspCache.set(ocspKey, parsed);
       }
       if (!parsed) continue;
@@ -419,55 +448,58 @@ export async function verifyLtv(
       // the signature is checked buys nothing — see response.ts.
       if (!parsed.signatureValid) continue;
       if (!(await ocspMatchesCert(parsed, subject, issuer))) continue;
+      // Nothing ends the search early: the DSS order is chosen by whoever wrote
+      // the PDF, and a later entry (or a CRL below) may prove an EARLIER
+      // revocation. The earliest authenticated revocation is what counts.
       if (parsed.certStatus === 'revoked') {
+        if (!linkRevoked) errors.push(`cert_revoked: ${getCN(subject) ?? 'unknown'}`);
         revokedFound = true;
         linkRevoked = true;
-        if (i === 0) signerRevocation = revocationOf(parsed.revokedAt);
-        errors.push(`cert_revoked: ${getCN(subject) ?? 'unknown'}`);
-        break;
+        if (i === 0) signerRevocation = earlierRevocation(signerRevocation, parsed.revokedAt);
+      } else if (parsed.certStatus === 'good') {
+        retrospectiveValid = true;
       }
-      // A `good` entry does not end the search: the DSS order is chosen by
-      // whoever wrote the PDF, and a later entry may prove a revocation.
-      if (parsed.certStatus === 'good') retrospectiveValid = true;
     }
 
-    // CRLs are checked too unless a revocation is already proven — an OCSP
-    // `good` must not hide a CRL that lists the cert.
-    if (!linkRevoked) {
-      for (const idx of crlIdx) {
-        if (Date.now() - ltvStart > LTV_BUDGET_MS) {
-          budgetTripped = true;
-          break;
+    // CRLs too: an OCSP `good` must not hide a CRL that lists the cert.
+    for (const idx of crlIdx) {
+      if (Date.now() - ltvStart > LTV_BUDGET_MS) {
+        budgetTripped = true;
+        break;
+      }
+      const crlDer = dss.crls[idx];
+      if (!crlDer) continue;
+      // Skip CRLs too large to parse synchronously without blocking past the
+      // watchdog. The profile is unaffected (derived from DSS presence).
+      if (crlDer.byteLength > MAX_CRL_BYTES) {
+        if (!errors.includes('crl_too_large_skipped')) {
+          errors.push(
+            `crl_too_large_skipped: ${crlDer.byteLength} bytes (revocación a largo plazo no verificada en este dispositivo)`,
+          );
         }
-        const crlDer = dss.crls[idx];
-        if (!crlDer) continue;
-        // Skip CRLs too large to parse synchronously without blocking past the
-        // watchdog. The profile is unaffected (derived from DSS presence).
-        if (crlDer.byteLength > MAX_CRL_BYTES) {
-          if (!errors.includes('crl_too_large_skipped')) {
-            errors.push(
-              `crl_too_large_skipped: ${crlDer.byteLength} bytes (revocación a largo plazo no verificada en este dispositivo)`,
-            );
-          }
-          continue;
-        }
-        const crl = parseCrlCached(idx, crlDer);
-        if (!crl) continue;
-        // DSS material can be appended after signing by anyone: only a CRL the
-        // subject's issuer actually signed says anything about the subject.
-        if (!(await crlIssuedBy(crl, issuer))) continue;
-        const status = isCertRevoked(parseCert(subject), crl);
-        if (status.revoked) {
-          revokedFound = true;
-          if (i === 0) signerRevocation = revocationOf(status.revokedAt);
-          errors.push(`cert_revoked_crl: ${getCN(subject) ?? 'unknown'}`);
-          break;
-        }
+        continue;
+      }
+      const crl = parseCrlCached(idx, crlDer);
+      if (!crl) continue;
+      // DSS material can be appended after signing by anyone: only a CRL the
+      // subject's issuer actually signed says anything about the subject.
+      if (!(await crlIssuedBy(crl, issuer))) continue;
+      const status = isCertRevoked(parseCert(subject), crl);
+      if (status.revoked) {
+        if (!linkRevoked) errors.push(`cert_revoked_crl: ${getCN(subject) ?? 'unknown'}`);
+        revokedFound = true;
+        linkRevoked = true;
+        if (i === 0) signerRevocation = earlierRevocation(signerRevocation, status.revokedAt);
+      } else {
         retrospectiveValid = true;
       }
     }
   }
 
+  // An interrupted scan may have stopped before the entry that proves a
+  // revocation: it can report what it found, never that revocation was
+  // checked and came out good.
+  if (budgetTripped) retrospectiveValid = false;
   if (budgetTripped && !errors.includes('crl_too_large_skipped')) {
     errors.push(
       'ltv_budget_exceeded: revocación a largo plazo no verificada por completo en este dispositivo',

@@ -86,6 +86,33 @@ async function ocspResponse(
   signer: Gen,
   opts: OcspOpts = {},
 ): Promise<Uint8Array> {
+  return ocspMulti([{ about, issuer, ...opts }], issuer, signer);
+}
+
+/** One response carrying several SingleResponses (RFC 6960 allows extra entries). */
+async function ocspMulti(
+  entries: (OcspOpts & { about: pkijs.Certificate; issuer: pkijs.Certificate })[],
+  responderIssuer: pkijs.Certificate,
+  signer: Gen,
+): Promise<Uint8Array> {
+  const basic = new pkijs.BasicOCSPResponse();
+  basic.tbsResponseData.responderID = responderIssuer.subject;
+  basic.tbsResponseData.producedAt = new Date();
+  for (const e of entries) basic.tbsResponseData.responses.push(await singleResponse(e));
+  await basic.sign(signer.privateKey, 'SHA-256');
+  const resp = new pkijs.OCSPResponse();
+  resp.responseStatus.valueBlock.valueDec = 0;
+  resp.responseBytes = new pkijs.ResponseBytes({
+    responseType: '1.3.6.1.5.5.7.48.1.1',
+    response: new asn1js.OctetString({ valueHex: basic.toSchema().toBER(false) }),
+  });
+  return new Uint8Array(resp.toSchema().toBER(false));
+}
+
+async function singleResponse(
+  opts: OcspOpts & { about: pkijs.Certificate; issuer: pkijs.Certificate },
+): Promise<pkijs.SingleResponse> {
+  const { about, issuer } = opts;
   const certID = new pkijs.CertID();
   await certID.createForCertificate(about, {
     hashAlgorithm: 'SHA-1',
@@ -103,23 +130,11 @@ async function ocspResponse(
         ],
       })
     : new asn1js.Primitive({ idBlock: { tagClass: 3, tagNumber: 0 }, lenBlockLength: 1 });
-  const single = new pkijs.SingleResponse({
+  return new pkijs.SingleResponse({
     certID,
     certStatus,
     thisUpdate: opts.thisUpdate ?? new Date(Date.now() - 60_000),
   });
-  const basic = new pkijs.BasicOCSPResponse();
-  basic.tbsResponseData.responderID = issuer.subject;
-  basic.tbsResponseData.producedAt = new Date();
-  basic.tbsResponseData.responses.push(single);
-  await basic.sign(signer.privateKey, 'SHA-256');
-  const resp = new pkijs.OCSPResponse();
-  resp.responseStatus.valueBlock.valueDec = 0;
-  resp.responseBytes = new pkijs.ResponseBytes({
-    responseType: '1.3.6.1.5.5.7.48.1.1',
-    response: new asn1js.OctetString({ valueHex: basic.toSchema().toBER(false) }),
-  });
-  return new Uint8Array(resp.toSchema().toBER(false));
 }
 
 function serveOcsp(bytes: Uint8Array): void {
@@ -192,7 +207,8 @@ describe('checkOcsp reads what the responder actually said', () => {
       issuerCert: ca.pkijsCert,
       acSlug: 'x',
     });
-    expect(r.status).not.toBe('good');
+    expect(r.status).toBe('unknown');
+    expect(r.reason).toBe('ocsp_response_not_current');
   });
 
   test('response whose CertID names another issuer (same serial) → not good', async () => {
@@ -204,7 +220,40 @@ describe('checkOcsp reads what the responder actually said', () => {
       issuerCert: ca.pkijsCert,
       acSlug: 'x',
     });
-    expect(r.status).not.toBe('good');
+    expect(r.status).toBe('unknown');
+    expect(r.reason).toBe('ocsp_response_unusable');
+  });
+
+  test('same serial under a foreign issuer (revoked, fresher) and the real one (revoked) → the real entry', async () => {
+    const revokedAt = new Date('2026-07-01T00:00:00Z');
+    serveOcsp(
+      await ocspMulti(
+        [
+          {
+            about: signer.pkijsCert,
+            issuer: ca.pkijsCert,
+            certIdIssuer: rogue.pkijsCert,
+            revokedAt: new Date('2026-08-15T00:00:00Z'),
+            thisUpdate: new Date(Date.now() - 1_000),
+          },
+          {
+            about: signer.pkijsCert,
+            issuer: ca.pkijsCert,
+            revokedAt,
+            thisUpdate: new Date(Date.now() - 3_600_000),
+          },
+        ],
+        ca.pkijsCert,
+        ca,
+      ),
+    );
+    const r = await checkOcsp({
+      signerCert: signer.pkijsCert,
+      issuerCert: ca.pkijsCert,
+      acSlug: 'x',
+    });
+    expect(r.status).toBe('revoked');
+    expect(r.revokedAt).toBe(revokedAt.toISOString());
   });
 });
 
@@ -223,6 +272,24 @@ describe('embedded (DSS) OCSP evidence does not depend on its order', () => {
       );
       expect(ltv.signerRevocation?.revokedAt?.toISOString()).toBe(revokedAt.toISOString());
       expect(ltv.retrospectiveValid).toBe(false);
+    });
+  }
+});
+
+describe('the earliest authenticated revocation decides, whatever the DSS order', () => {
+  const early = new Date('2026-03-01T00:00:00Z');
+  const late = new Date('2026-08-01T00:00:00Z');
+  for (const order of ['late-first', 'early-first'] as const) {
+    test(`${order}: two signed revocations with different dates → the earlier one`, async () => {
+      const a = await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, { revokedAt: late });
+      const b = await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, { revokedAt: early });
+      const ltv = await verifyLtv(
+        [signer.pkijsCert, ca.pkijsCert],
+        { certs: [], ocsps: order === 'late-first' ? [a, b] : [b, a], crls: [], vri: {} },
+        new Uint8Array([1]),
+        new Uint8Array(0),
+      );
+      expect(ltv.signerRevocation?.revokedAt?.toISOString()).toBe(early.toISOString());
     });
   }
 });

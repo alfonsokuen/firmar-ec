@@ -5,7 +5,7 @@ import {
 } from '@firma-ec/ltv-validation';
 import { OCSPRequest } from 'pkijs';
 import type { Certificate } from 'pkijs';
-import { ocspMatchesCert, serialHexOf, toLtvParsedCert } from './ltv';
+import { issuerKeyHashByAlgo, ocspMatchesCert, serialHexOf, toLtvParsedCert } from './ltv';
 import type { OcspStatus } from './result';
 
 const OCSP_PROXY_BASE = 'https://ocsp.firmar.ec';
@@ -101,6 +101,7 @@ export async function checkOcsp(
     try {
       parsed = await parseOcspResponse(respBytes, toLtvParsedCert(ctx.issuerCert), {
         serialHex: serialHexOf(ctx.signerCert),
+        issuerKeyHashByAlgo: await issuerKeyHashByAlgo(ctx.issuerCert),
       });
     } catch (e) {
       if (e instanceof OcspParseError) {

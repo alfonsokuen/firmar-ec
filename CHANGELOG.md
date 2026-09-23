@@ -38,7 +38,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 - **La evidencia de revocación embebida (DSS) decide el veredicto** cuando está autenticada (OCSP
   verificado o CRL firmada por la CA emisora); antes solo generaba un aviso y un firmante revocado podía
   salir válido. Las CRL embebidas sin firma de la CA emisora ya no cuentan en ningún sentido, y una
-  respuesta favorable ya no corta la búsqueda: el orden de la DSS lo elige quien escribe el PDF.
+  respuesta favorable ya no corta la búsqueda: el orden de la DSS lo elige quien escribe el PDF. Se
+  revisa toda la evidencia (OCSP y CRL) y decide la revocación más temprana; si el presupuesto de la
+  LTV se agota, no se afirma que la revocación se comprobó con resultado bueno.
+- En respuestas OCSP con varias entradas, la entrada se elige por serial **y** hash de clave del
+  emisor (según el algoritmo de cada `CertID`) antes de mirar su estado.
 - Un sello añadido después de que caducara el certificado ya no da «Firma inválida — emisor no
   reconocido»: se valida en la fecha declarada como `signing_time_unproven`.
 - Un certificado sin uso de clave de firma (`digitalSignature`/`nonRepudiation`) se rechaza

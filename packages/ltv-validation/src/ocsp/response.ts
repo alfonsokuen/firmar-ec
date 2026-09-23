@@ -87,6 +87,13 @@ interface ExpectedCertId {
   serialHex: string;
   /** Hex of the request's issuerKeyHash. When provided, a SingleResponse must match it too (not just the serial). */
   issuerKeyHashHex?: string;
+  /**
+   * The issuer's key hash under each CertID algorithm. When provided, every
+   * SingleResponse is matched against the hash for ITS OWN algorithm, so a
+   * response mixing entries for several issuers selects the right one before
+   * status is considered (an `other` algorithm never matches).
+   */
+  issuerKeyHashByAlgo?: Partial<Record<'sha1' | 'sha256', string>>;
 }
 
 function toAB(u: Uint8Array): ArrayBuffer {
@@ -372,16 +379,31 @@ function selectMatchingResponse(
   const wantSerial = normalizeSerialHex(expected.serialHex);
   const wantKeyHash = expected.issuerKeyHashHex?.toLowerCase();
 
+  const byAlgo = expected.issuerKeyHashByAlgo;
+
   const matches = views.filter((v) => {
     if (normalizeSerialHex(v.serialHex) !== wantSerial) return false;
     if (wantKeyHash !== undefined && v.issuerKeyHashHex.toLowerCase() !== wantKeyHash) return false;
+    if (byAlgo !== undefined) {
+      const want = v.certIdHashAlgo === 'other' ? undefined : byAlgo[v.certIdHashAlgo];
+      if (want === undefined || v.issuerKeyHashHex.toLowerCase() !== want.toLowerCase())
+        return false;
+    }
     return true;
   });
   if (matches.length === 0) return null;
 
+  // Several revoked entries: the EARLIEST revocation is the one that decides
+  // a verdict; an undated one wins outright (fail closed).
   const revoked = matches.filter((v) => v.certStatus === 'revoked');
-  const pool = revoked.length > 0 ? revoked : matches;
-  return pool.reduce((newest, v) => (v.thisUpdate > newest.thisUpdate ? v : newest));
+  if (revoked.length > 0) {
+    return revoked.reduce((earliest, v) => {
+      if (earliest.revokedAt === undefined) return earliest;
+      if (v.revokedAt === undefined) return v;
+      return v.revokedAt < earliest.revokedAt ? v : earliest;
+    });
+  }
+  return matches.reduce((newest, v) => (v.thisUpdate > newest.thisUpdate ? v : newest));
 }
 
 /** Parse the nonce extension (OID 1.3.6.1.5.5.7.48.1.2), tolerating both the
