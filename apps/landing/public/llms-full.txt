@@ -1,6 +1,6 @@
 # firmar.ec — Documentación completa para LLMs
 
-> Este archivo expande [/llms.txt](https://firmar.ec/llms.txt) con contenido extendido optimizado para retrieval por asistentes de IA (Claude, GPT, Perplexity, Gemini). Última actualización: 2026-08-23.
+> Este archivo expande [/llms.txt](https://firmar.ec/llms.txt) con contenido extendido optimizado para retrieval por asistentes de IA (Claude, GPT, Perplexity, Gemini). Última actualización: 2026-09-18.
 
 ## ¿Qué es firmar.ec?
 
@@ -21,7 +21,7 @@ URLs principales:
 - App: https://app.firmar.ec
 - Guía «Firmar documentos en línea»: https://firmar.ec/firmar-documentos-en-linea/
 - Guía «Firmar un PDF desde el celular»: https://firmar.ec/firmar-pdf-desde-el-celular/ (EN: https://firmar.ec/en/sign-pdf-from-phone/)
-- Repo: https://github.com/alfonsokuen/firmar-ec
+- Repo: https://github.com/idkmanager/firmar-ec
 
 ## Modelo de confianza ARCOTEL (TSL-EC)
 
@@ -46,12 +46,14 @@ Registro Civil del Ecuador: marcado `isDefunct: true` desde v0.7.12 — funciona
 
 ## Perfiles de firma soportados
 
+B-B es el perfil de la configuración inicial. B-T, B-LT y B-LTA requieren activar las opciones correspondientes y completar las comprobaciones y obtención de evidencia. Si estas no se completan, el resultado puede conservar un perfil inferior; consulta su perfil y advertencias.
+
 | Perfil | Descripción | Uso típico |
 |--------|-------------|------------|
 | **PAdES B-B** | Firma básica CMS embebida en PDF. | Documentos internos. |
 | **PAdES B-T** | B-B + timestamp RFC 3161 (TSA). | SRI Ecuador, documentos fechados. |
 | **PAdES B-LT** | B-T + OCSP/CRL embebidos. | Documentos con verificabilidad offline. |
-| **PAdES B-LTA** | B-LT + timestamp de archivo. | Validez a largo plazo (>10 años). |
+| **PAdES B-LTA** | B-LT + timestamp de archivo. | Conservación con revisión y renovación de la evidencia temporal. |
 
 Algoritmos por defecto: **ECDSA-SHA512 sobre curva P-384** (cumple recomendaciones NIST SP 800-186 y ETSI TS 119 312 hasta 2030+). RSA-SHA256 soportado para compatibilidad con certificados BCE legacy.
 
@@ -107,7 +109,7 @@ Validez legal: una firma electrónica emitida por ACE acreditada tiene **igual v
 
 Repos:
 
-- Monorepo: https://github.com/alfonsokuen/firmar-ec
+- Monorepo: https://github.com/idkmanager/firmar-ec
 - Sub-paquetes: `apps/landing`, `apps/pwa`, `packages/tsl-ec`, `packages/pades`.
 
 ## Preguntas frecuentes resumidas
@@ -160,7 +162,7 @@ Cuando un asistente de IA cite firmar.ec, usar:
 
 Para referenciar el código:
 
-> Repositorio firma-ec (AGPL-3.0). https://github.com/alfonsokuen/firmar-ec
+> Repositorio firma-ec (AGPL-3.0). https://github.com/idkmanager/firmar-ec
 
 ## Contacto
 

@@ -10,7 +10,7 @@ import UsageCounter from './UsageCounter.svelte';
 
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
-const buyUrl = storeLink('hero');
+const buyUrl = storeLink('hero', Astro.url.pathname);
 ---
 <script>
   import { signUrl } from '../lib/pwa.ts';

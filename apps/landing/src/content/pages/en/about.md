@@ -2,6 +2,7 @@
 title: "About firmar.ec"
 description: "Why firmar.ec exists, who is behind it, and why it is free and open-source. A project by IDK Manager."
 lang: en
+dateModified: "2026-09-18"
 datePublished: "2026-05-08"
 h1: "About firmar.ec"
 breadcrumbs:
@@ -10,11 +11,7 @@ breadcrumbs:
 
 ## Why firmar.ec exists
 
-In Ecuador, **electronically signing a PDF** is still harder than it should be:
-
-- **FirmaEC by MINTEL** (Ecuador's Ministry of Telecommunications) is an excellent desktop app, but it requires Java to be installed, token driver configuration, and does not work on mobile or on restricted machines.
-- **Commercial SaaS services** (Adobe Sign, DocuSign, etc.) ask you to upload your certificate to their servers, which is uncomfortable for anyone who takes **LOPDP** (Ecuadorian Personal Data Protection Law) compliance seriously.
-- **Open-source Ecuadorian web alternatives** simply **did not exist** before this project.
+We want to make certificate-based PDF signing and review accessible from a browser without sending the private key to the service. Tools have different requirements and trust models; our approach is to make ours explicit and inspectable.
 
 firmar.ec solves this with **a public, free, registration-free, tracking-free PWA where your private key never leaves the browser**.
 
@@ -28,26 +25,20 @@ The cost of maintenance (domain, hosting, certificates, code upkeep) is borne by
 
 ## Why open-source?
 
-A tool that asks for your private key **must be auditable**. AGPL-3.0 + 3 public mirrors + releases signed with Sigstore Cosign + public Rekor transparency log entry + SLSA L2 with L3 elements exist so that any person, team, or public entity can **verify for themselves** that firmar.ec behaves as we say. Reproducible builds: on roadmap.
+A tool that processes a private key should be inspectable. We publish the [source code and AGPL-3.0 licence](https://github.com/idkmanager/firmar-ec), tests and development instructions. Inspect the code for the version you are evaluating; an open licence alone does not constitute an independent audit.
 
-If you are going to trust your electronic signature to a web service, don't accept "trust us." Verify.
+Our [verification methodology](/en/verification-methodology/) explains what each check demonstrates and which limitations to record. [Alfonso Kuen Arroyo’s profile](https://idkmanager.com/equipo/alfonso-kuen-arroyo/) identifies the project’s technical lead.
 
 ## How does it stay sustainable?
 
-- **Simple, maintainable code** (Astro 5 + Svelte 5 + audited crypto libs) — minimises accumulated technical debt.
-- **Zero application server** — the app is static; hosting costs are negligible.
+- **Simple, maintainable code** (Astro 5 + Svelte 5 + open-source cryptographic libraries) — minimises accumulated technical debt.
+- **Static application** — the app is served as files. An owned backend provides aggregate usage counters; see the privacy notice.
 - **Community** — we accept issues, PRs, and translations. If your organisation wants to contribute or collaborate, get in touch.
 - **Plan B** — if IDK Manager were to stop operating the service, the code remains available on GitHub under AGPL-3.0; anyone can continue operations under a new domain.
 
-## Public roadmap
+## Project status
 
-- **v1 (current)**: sign + verify PAdES B-B PDFs with certificates from the 16 accredited Ecuadorian ECIs that operate their own root.
-- **v1.1**: timestamped signing (PAdES B-T) once we identify an accredited TSA in Ecuador.
-- **v1.2**: long-term validation (PAdES B-LT) — chain + revocation data embedded.
-- **v1.x**: Kichwa language support, bulk signing, WebAuthn 2FA integration, photo seal.
-- **Aspiration**: if the community requests it, support for XAdES (XML, SRI) and CAdES (detached signature).
-
-Every roadmap decision is discussed in GitHub Issues. Your input matters.
+Consult the [published releases](https://github.com/idkmanager/firmar-ec/releases), [changelog](https://github.com/idkmanager/firmar-ec/blob/main/CHANGELOG.md) and [open proposals](https://github.com/idkmanager/firmar-ec/issues) to distinguish available features from proposed work. Each signature’s capabilities depend on its configuration, certificate and available evidence.
 
 ## Contact
 

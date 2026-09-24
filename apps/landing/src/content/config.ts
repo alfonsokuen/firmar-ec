@@ -34,6 +34,7 @@ const pages = defineCollection({
     h1: z.string().optional(),
     breadcrumbs: z.array(z.object({ name: z.string(), url: z.string() })).default([]),
     related: z.array(z.object({ title: z.string(), href: z.string() })).default([]),
+    faq: z.array(z.object({ question: z.string(), answer: z.string() })).default([]),
   }),
 });
 

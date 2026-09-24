@@ -9,6 +9,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+// Discovery files are hand-maintained. Compare their repository links against
+// SITE.githubOrg, the same canonical repository used by SoftwareSourceCode.
+export function discoveryRepositoryErrors(documents, canonicalRepository) {
+  const errors = [];
+  for (const [name, text] of Object.entries(documents)) {
+    for (const match of text.matchAll(/https:\/\/github\.com\/[\w-]+\/firmar-ec\b/g)) {
+      if (match[0] !== canonicalRepository) errors.push(`${name}: non-canonical repository ${match[0]}`);
+    }
+  }
+  return errors;
+}
+
 const EXCEPTIONS = new Set([
   'https://firmar.ec/', // home is the file itself; no self-entry needed
 ]);
@@ -40,6 +52,19 @@ export const isExempt = (url) =>
 export function main() {
   const sitemap = readFileSync(join(ROOT, 'dist/sitemap-0.xml'), 'utf8');
   const llms = readFileSync(join(ROOT, 'public/llms.txt'), 'utf8');
+  const identity = readFileSync(join(ROOT, 'src/lib/jsonld.ts'), 'utf8');
+  const canonicalRepository = identity.match(/githubOrg:\s*'([^']+)'/)?.[1];
+  if (!canonicalRepository) throw new Error('SITE.githubOrg is missing');
+  const documents = {
+    'llms.txt': llms,
+    'llms-full.txt': readFileSync(join(ROOT, 'public/llms-full.txt'), 'utf8'),
+    'ai-plugin.json': readFileSync(join(ROOT, 'public/.well-known/ai-plugin.json'), 'utf8'),
+  };
+  const repositoryErrors = discoveryRepositoryErrors(documents, canonicalRepository);
+  if (repositoryErrors.length > 0) {
+    console.error(repositoryErrors.join('\n'));
+    return 1;
+  }
 
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   const esUrls = urls.filter((u) => !u.startsWith('https://firmar.ec/en/'));

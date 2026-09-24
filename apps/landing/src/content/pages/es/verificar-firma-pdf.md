@@ -2,6 +2,7 @@
 title: "Cómo verificar la firma de un PDF en Ecuador"
 description: "Verifica si un PDF firmado es válido: integridad del documento, certificado de una ECI de ARCOTEL y estado de revocación. En el navegador, sin instalar nada."
 lang: es
+dateModified: "2026-09-18"
 datePublished: "2026-05-25"
 h1: "Cómo verificar la firma electrónica de un PDF"
 breadcrumbs:
@@ -49,3 +50,7 @@ También puedes verificar una firma PAdES en **Adobe Acrobat Reader** (panel de 
 **¿La verificación funciona sin internet?** La comprobación de integridad y de la cadena del certificado sí; la consulta de revocación en tiempo real (OCSP) requiere conexión.
 
 **Recibí un PDF y dice "firma inválida", ¿qué hago?** Suele significar que el documento se editó después de firmarse, o que el certificado estaba caducado/revocado al firmar. Pide al emisor que vuelva a firmar el documento final.
+
+## Interpretar los resultados
+
+Consulta la [metodología de verificación de firmas PDF](/metodologia-verificacion/): integridad, confianza, revocación y tiempo son comprobaciones distintas. Incluye una lista para documentar la revisión y sus límites.

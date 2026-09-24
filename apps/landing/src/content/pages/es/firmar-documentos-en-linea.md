@@ -1,116 +1,77 @@
 ---
-title: "Firmar documentos en línea gratis | firma electrónica Ecuador"
-description: "Cómo se firma electrónicamente un documento en Ecuador: qué es la firma electrónica, qué necesitas, los tres pasos del proceso con tu certificado .p12 (BCE, Security Data y demás ECIs de ARCOTEL) y qué validez tiene el resultado."
+title: "Firmar documentos en línea con firma electrónica en Ecuador"
+description: "Firma documentos PDF en línea con tu certificado .p12 o .pfx en Ecuador. Herramienta gratis, pasos de firma, privacidad y requisitos para entregar tu PDF."
 lang: es
 datePublished: "2026-06-14"
-dateModified: "2026-08-23"
-h1: "Firmar documentos en línea"
+dateModified: "2026-09-16"
+h1: "Firmar documentos en línea con firma electrónica en Ecuador"
 breadcrumbs:
   - { name: "Firmar documentos en línea", url: "https://firmar.ec/firmar-documentos-en-linea/" }
 related:
-  - { title: "Cómo firmar un PDF", href: "/como-firmar-pdf/" }
-  - { title: "Firmar PDF online gratis sin instalar", href: "/firmar-pdf-online-gratis-sin-instalar-programas/" }
-  - { title: "Firma electrónica en Ecuador", href: "/firma-electronica-ecuador/" }
+  - { title: "Firmar con un certificado Security Data", href: "/como-firmar-con-certificado-security-data/" }
   - { title: "Cómo obtener un certificado", href: "/como-obtener-certificado-firma-electronica/" }
+  - { title: "Precios de firma electrónica", href: "/precios/" }
   - { title: "Cómo verificar la firma de un PDF", href: "/verificar-firma-pdf/" }
   - { title: "Firmar un PDF desde el celular", href: "/firmar-pdf-desde-el-celular/" }
-  - { title: "firmar.ec vs FirmaEC", href: "/comparativos/firmaec/" }
+  - { title: "Firma electrónica en Ecuador: marco legal", href: "/firma-electronica-ecuador/" }
+  - { title: "Comparativa de firmar.ec y FirmaEC", href: "/comparativos/firmaec/" }
+faq:
+  - question: "¿Cómo se firma electrónicamente un documento en Ecuador?"
+    answer: "Para firmar un PDF en firmar.ec necesitas un certificado electrónico en archivo .p12 o .pfx y su contraseña. Selecciona el PDF, coloca la firma visible, carga el certificado, revisa el resumen y firma. Descarga el resultado y verifica la firma antes de entregarlo."
+  - question: "¿Puedo firmar documentos en línea gratis?"
+    answer: "Sí. La herramienta web de firmar.ec permite firmar PDFs gratis y sin crear una cuenta. Necesitas tu propio certificado electrónico: su emisión y renovación tienen las condiciones y tarifas del proveedor que elijas."
+  - question: "¿Puedo firmar un documento Word o una factura XML?"
+    answer: "Este flujo firma PDFs. Exporta tu documento Word a PDF antes de empezar. Una factura electrónica XML requiere el flujo de facturación correspondiente; firmar su representación en PDF no firma el XML."
+  - question: "¿Mi certificado y mi PDF se envían a un servidor para firmar?"
+    answer: "No. En este flujo de firma, el PDF, el archivo .p12 o .pfx y su contraseña se procesan en el navegador. Las funciones de sello de tiempo o consulta del estado del certificado pueden necesitar conexiones externas."
+  - question: "¿Puedo firmar desde el celular con un token USB?"
+    answer: "El flujo web usa archivos .p12 o .pfx seleccionados desde tu dispositivo y no admite tokens USB. Para un token, consulta la aplicación y los controladores indicados por su emisor."
 ---
 
-> **¿Cómo se firma electrónicamente un documento en Ecuador?** Con un certificado de firma electrónica en archivo `.p12`, emitido por una ECI acreditada por ARCOTEL (BCE, Security Data, Uanataca, Consejo de la Judicatura, ArgosData y demás). Cargas el documento y el certificado en un firmador, ingresas la contraseña y obtienes un PDF con una firma **PAdES** (ETSI EN 319 142), que el artículo 14 de la Ley de Comercio Electrónico equipara a la firma manuscrita y que aceptan el SRI, la banca y las instituciones públicas. En firmar.ec ese firmador es una página web y la firma se calcula dentro de tu propio navegador.
+**Puedes firmar documentos PDF en línea con tu firma electrónica en Ecuador usando un certificado `.p12` o `.pfx` y su contraseña.** firmar.ec permite hacerlo gratis desde el navegador de tu computadora o celular: seleccionas el PDF, cargas tu certificado y descargas el documento firmado. No necesitas instalar una aplicación de escritorio ni crear una cuenta.
 
-**firmar.ec es una página web para firmar documentos en línea, gratis y sin instalar nada.** Subes tu PDF, cargas tu certificado electrónico `.p12` y descargas el documento firmado — todo dentro de tu navegador. Tu llave privada nunca se envía a ningún servidor.
+**El certificado y el firmador son cosas distintas.** El certificado identifica al titular y lo emite un proveedor; firmar.ec es la herramienta que lo utiliza para firmar el PDF. Si buscas comprar una firma electrónica, empieza por [cómo obtener un certificado](/como-obtener-certificado-firma-electronica/) y [cuánto cuesta](/precios/).
 
-A continuación te explicamos cómo se firma electrónicamente un documento en Ecuador, qué necesitas y por qué puedes hacerlo aquí sin pagar.
+[Firmar un documento ahora →](https://app.firmar.ec/firmar)
 
-[Firmar un documento ahora →](https://app.firmar.ec/)
+## ¿Qué necesitas para firmar documentos en línea?
 
-## ¿Cómo se firma electrónicamente un documento?
+- **Un PDF** con el contenido definitivo. Si está en Word u otro editor, expórtalo a PDF.
+- **Tu certificado electrónico en archivo `.p12` o `.pfx`** y su contraseña. Verifica que corresponde al titular que debe firmar y que está vigente.
+- **Un navegador actualizado**, también disponible en celular.
 
-Firmar documentos con firma electrónica toma tres pasos y menos de un minuto:
+Si tu certificado es de Security Data, consulta la [guía específica para firmar con Security Data](/como-firmar-con-certificado-security-data/). Si es de otro emisor, puedes empezar por [validar el certificado](/validar-certificado/). Los tokens USB y las credenciales que solo funcionan en la nube del proveedor requieren su propio flujo.
 
-1. **Sube el documento.** Abre la app y arrastra el PDF que quieres firmar.
-2. **Carga tu certificado.** Selecciona tu archivo `.p12` (también llamado `.pfx`) e introduce su contraseña. El certificado se procesa en la memoria de tu navegador; no sale de tu equipo.
-3. **Firma y descarga.** firmar.ec genera una firma PAdES válida y te devuelve el documento firmado, listo para el SRI, Quipux, SERCOP, un banco o cualquier institución que lo exija.
+## Cómo firmar un documento PDF paso a paso
 
-Eso es todo. No hay registro, no hay límite de firmas y no se instala Java ni ningún driver.
+1. **Abre la app.** Visita app.firmar.ec/firmar en tu navegador.
+2. **Selecciona el PDF y coloca la firma visible.** Elige la página y la posición del cuadro de firma.
+3. **Selecciona tu certificado.** Carga el archivo .p12 o .pfx del titular que debe firmar.
+4. **Comprueba la contraseña y firma.** Introduce la contraseña del archivo, revisa el titular y el resumen, y pulsa Firmar PDF.
+5. **Descarga y verifica.** Guarda el PDF firmado y comprueba su firma antes de entregarlo.
 
-## Una página web para firmar documentos, sin instalar nada
-
-La mayoría de las herramientas para firmar documentos electrónicos en Ecuador son aplicaciones de escritorio que exigen Java y la configuración del token. firmar.ec es distinto: es una **página web para firmar documentos** que funciona en cualquier navegador moderno, también en celular. No descargas programas, no actualizas runtimes y no dependes del sistema operativo.
-
-Como la firma ocurre del lado del cliente (con WebCrypto y `pkijs`), el documento y la clave privada **nunca viajan por la red**. Es la misma garantía de privacidad de una app instalada, pero sin instalar nada.
-
-## Datos duros: firmar.ec frente a FirmaEC
-
-FirmaEC es el firmador oficial del MINTEL y tiene versión de escritorio y **también app móvil desde agosto de 2022** (v2.11.0, Android 8.0+ e iOS 12+, según el [registro de cambios oficial](https://www.firmadigital.gob.ec/registro-de-cambios-de-firmaecchangelog/); consultado el 23 de agosto de 2026). Ambas herramientas producen firmas PAdES válidas; la diferencia está en los límites operativos:
-
-| Dato | firmar.ec | FirmaEC |
-|---|---|---|
-| **Cómo se usa** | Página web / PWA en el navegador; nada que instalar | Aplicación instalable (escritorio y móvil) |
-| **Java** | No requiere Java ni runtimes | Aplicación Java con JRE embebido: su [manual v4.0.0](https://www.firmadigital.gob.ec/wp-content/uploads/2025/08/Manual-Usuario-FirmaEC-v4.0.0.pdf) documenta invocar el firmador a través del `jre` que trae la propia instalación |
-| **Tamaño máximo por PDF** | 50 MB en cualquier dispositivo (40 MB por archivo en firma por lotes) | 4 MB en móvil · 512 MB en escritorio ([registro de cambios oficial](https://www.firmadigital.gob.ec/registro-de-cambios-de-firmaecchangelog/), v5.0.0) |
-| **Conexión a internet** | Solo para cargar la página: con la configuración por defecto la firma se calcula sin red (ver «Firmar sin conexión» más abajo) | Requerida: «Para el funcionamiento de FirmaEC es necesario tener acceso al servicio de internet» ([manual v4.0.0](https://www.firmadigital.gob.ec/wp-content/uploads/2025/08/Manual-Usuario-FirmaEC-v4.0.0.pdf), sec. 3) |
-| **Dónde se procesa tu llave privada** | En tu navegador (Web Crypto API, `CryptoKey extractable:false`); nunca sale del equipo | En la aplicación instalada, en tu equipo |
-| **Formato de firma** | PDF con PAdES Baseline B-B (ETSI EN 319 142-1) | PAdES para PDF y XAdES para comprobantes XML del SRI |
-| **Token criptográfico USB (PKCS#11)** | No soportado: se firma con archivo `.p12` / `.pfx` | Sí |
-
-En resumen: si tu certificado está en un archivo `.p12` y quieres firmar un PDF sin instalar nada —sobre todo desde el celular, donde FirmaEC topa en 4 MB—, firmar.ec te resuelve el caso. Si necesitas firmar con **token USB físico** o generar **XAdES** para el SRI, FirmaEC sigue siendo la herramienta.
-
-## Firmar sin conexión: qué necesita red y qué no
-
-La firma criptográfica se calcula **íntegramente en tu navegador**: no hay servidor de firma, y ni el PDF ni tu llave privada viajan por la red. Con la configuración por defecto —perfil **PAdES Baseline B-B**, sin sello de tiempo— puedes firmar sin conexión una vez cargada la página.
-
-Hay dos casos en los que sí hace falta internet:
-
-- **Sello de tiempo (TSA) y validación a largo plazo (LTV/OCSP/CRL).** Vienen **desactivados por defecto**; si los activas, la app consulta servidores externos y sin red no puede completarlos.
-- **La primera firma con un `.p12` que solo contiene tu certificado final.** Varias ECIs entregan el archivo sin el certificado intermedio de su CA subordinada. En ese caso la app intenta descargarlo del propio certificado (extensión AIA `caIssuers`, RFC 5280) para dejar el PDF autocontenido y que valide también en Adobe. Si esa descarga no está disponible, **el PDF se firma igual**: lo que se pierde es que un verificador offline pueda reconstruir la cadena por sí solo.
-
-## Firmar documentos gratis: qué pagas y qué no
-
-firmar.ec es **gratis** para uso personal de todos los ecuatorianos. No hay límite de documentos. Cualquier servicio que cobre por firmar un PDF cobra por la **conveniencia**, no por la validez: la validez legal la otorga tu certificado emitido por una ECI acreditada, no el software que lo usa.
-
-Lo único que necesitas es un certificado de firma electrónica vigente. Si todavía no tienes uno, lee [cómo obtener un certificado de firma electrónica](/como-obtener-certificado-firma-electronica/) o compara precios y emisores en la [comparativa de ECIs de Ecuador](/comparativa-emisores-ecuador/).
-
-## Firmar documentos con firma electrónica reconocida en Ecuador
-
-Para que la firma tenga la misma validez legal que tu firma manuscrita (Ley de Comercio Electrónico, Ley 2002-67), el certificado debe provenir de una **Entidad de Certificación de Información (ECI) acreditada por ARCOTEL**. firmar.ec reconoce las raíces de las ECIs acreditadas, entre ellas:
-
-- **Banco Central del Ecuador (BCE)** — el certificado más usado por personas naturales y jurídicas. Guía: [firmar con certificado del BCE](/como-firmar-con-certificado-bce/).
-- **Security Data** — una de las ECIs más usadas en el SRI y la banca. Guía: [firmar documentos con un certificado de Security Data](/como-firmar-con-certificado-security-data/).
-- **Uanataca, ArgosData, Consejo de la Judicatura, ANFAC, Eclipsoft, Datil** y demás ECIs acreditadas.
-
-Si tu certificado fue emitido por cualquiera de ellas, firmar.ec lo reconoce automáticamente contra la lista de raíces que trae la propia app, sin subir nada a ningún servidor.
+La guía [cómo firmar un PDF](/como-firmar-pdf/) amplía el procedimiento. Para revisar el resultado, abre [Verificar PDF](https://app.firmar.ec/verificar) y selecciona el archivo descargado. Conserva ese PDF: imprimirlo o convertirlo en una imagen no conserva la firma criptográfica para su verificación.
 
 ## ¿Qué documentos puedes firmar?
 
-firmar.ec firma **documentos PDF** con el estándar **PAdES** (la firma queda embebida dentro del propio PDF). Sirve para la gran mayoría de trámites administrativos:
+Puedes utilizar el flujo con contratos, actas, formularios, oficios y otros documentos **en PDF**. Antes de entregarlos, consulta los requisitos de quien los recibe: puede pedir un formato, una plataforma o evidencias adicionales.
 
-- Contratos, adendas, NDAs y actas.
-- Autorizaciones, declaraciones juradas y poderes en PDF.
-- Formularios y oficios para el sector público (municipios, ministerios, IESS).
-- Documentos que un banco o el SRI te pidan firmar en PDF.
+Para facturación electrónica, distingue el comprobante **XML** de su representación en PDF. Este firmador de PDF no reemplaza el sistema que genera y firma el XML para el SRI.
 
-Para comprobantes electrónicos del SRI en XML (factura, retención) se usa el formato XAdES, que normalmente genera tu sistema contable o FirmaEC del MINTEL.
+## ¿Dónde se procesan el PDF y la clave privada?
 
-## Validez legal de los documentos firmados
+La firma se calcula en tu navegador. **El PDF, el certificado `.p12` y la contraseña no se envían a un servidor de firma.** Si eliges compartir el resultado después de descargarlo, se lo estarás enviando al destinatario que selecciones.
 
-Un documento firmado con firmar.ec produce una firma **PAdES** equivalente a la de FirmaEC, el firmador oficial del MINTEL. Ante el SRI, la banca y las instituciones públicas, **un PDF firmado con tu certificado tiene plena validez** — lo que importa es el certificado, no la herramienta. Puedes comprobar cualquier firma en [verificar la firma de un PDF](/verificar-firma-pdf/).
+Algunas operaciones sí pueden necesitar internet: cargar la aplicación, obtener certificados intermedios, solicitar un sello de tiempo o consultar el estado de un certificado. No confundas el procesamiento local del documento con la ausencia absoluta de conexiones de red.
 
-## Preguntas frecuentes
+## ¿Qué validez tiene la firma electrónica en Ecuador?
 
-**¿Cuánto cuesta?** Cero. firmar.ec es un proyecto open-source sin fines de lucro de IDK Manager. No hay plan premium, no hay suscripción, no hay límite de firmas. Tampoco hay publicidad ni telemetría: el costo de mantenimiento lo asume IDK Manager como contribución al ecosistema digital ecuatoriano.
+El artículo 14 de la [Ley de Comercio Electrónico, Firmas Electrónicas y Mensajes de Datos, publicada por ARCOTEL](https://www.arcotel.gob.ec/wp-content/uploads/2015/12/ley-comercio-electronico-firmas-electronicas-y-mensaje-de-datos.pdf) reconoce efectos jurídicos equivalentes a la firma manuscrita. El artículo 15 establece requisitos de validez, entre ellos la vinculación con el titular y la posibilidad de comprobar su identidad e integridad.
 
-**¿Mi llave privada (`.p12`) llega al servidor?** No. La firma sucede 100% en tu navegador. El archivo `.p12` y la contraseña se procesan dentro de un Web Worker dedicado, la llave privada se importa al Web Crypto API como `CryptoKey extractable:false`, y los buffers se sobrescriben con ceros al terminar. Puedes verificarlo tú mismo abriendo DevTools → Network durante la firma: no hay ningún request saliente que lleve esos datos.
+**Usar un firmador no garantiza por sí solo la aceptación de cualquier trámite.** Revisa el certificado, verifica la firma del PDF y confirma las exigencias de la entidad receptora. Encontrarás más contexto en [firma electrónica en Ecuador](/firma-electronica-ecuador/).
 
-**¿Qué tipos de archivo puedo firmar?** En esta versión, solo PDFs. Soporte de XAdES (XML para SRI) y CAdES (firma detached para cualquier archivo) está en el roadmap pero no en v1. Si necesitas firmar comprobantes electrónicos del SRI hoy, tu mejor opción sigue siendo el flujo nativo en tu sistema contable.
+## ¿Qué pagas al firmar?
 
-**¿La firma tiene validez legal en Ecuador?** Sí, siempre que tu certificado haya sido emitido por una **Entidad de Certificación de Información (ECI) acreditada por ARCOTEL**: BCE, Consejo de la Judicatura (iCert-EC), Security Data, ANFAC, ArgosData, Uanataca, Eclipse Soft, Datil. Estas firmas son **firma electrónica avanzada** (FEA) según la Ley de Comercio Electrónico, Firmas Electrónicas y Mensajes de Datos (Ley 2002-67) y tienen los mismos efectos jurídicos que una firma manuscrita (art. 14).
+El uso de la herramienta web para firmar PDFs es gratuito. El **certificado electrónico** se obtiene aparte: cada emisor establece sus tarifas, vigencias y condiciones de renovación. Consulta [precios de certificados](/precios/) para comparar ofertas en la misma modalidad y con el IVA identificado.
 
-**¿Es compatible con FirmaEC del MINTEL?** Sí. Los PDFs firmados por firmar.ec usan el perfil **PAdES Baseline B-B** (ETSI EN 319 142-1), el mismo que produce FirmaEC desktop. Pueden validarse en FirmaEC, Adobe Reader, validador del MINTEL Minka, validador del SRI y cualquier otro verificador PAdES estándar.
-
-## Empieza a firmar documentos en línea
-
-No necesitas crear una cuenta. Abre la app, sube tu documento y firma.
-
-[Abrir firmar.ec y firmar un documento →](https://app.firmar.ec/)
+[Ya tengo mi certificado: abrir el firmador →](https://app.firmar.ec/firmar)
