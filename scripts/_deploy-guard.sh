@@ -17,7 +17,9 @@
 # persisted — a bypass left in .deploy.env would silently disable the guard
 # for every later deploy, so that is refused. The bypass is loud.
 #
-# Usage: source this file BEFORE _deploy-env.sh, call deploy_guard_on_main after it.
+# Usage: source this file and call deploy_guard_on_main BEFORE sourcing
+# _deploy-env.sh, so nothing .deploy.env defines (a variable, a function, even
+# a `git` wrapper) can reach the check.
 
 readonly DEPLOY_GUARD_REMOTE=gitea
 readonly DEPLOY_GUARD_BRANCH=main
@@ -64,5 +66,5 @@ deploy_guard_on_main() {
   echo "           integra el cambio en main, o solo en emergencia repite con ALLOW_OFF_MAIN_DEPLOY=1." >&2
   return 1
 }
-# The env file is sourced after this one: it must not be able to replace the check.
+# Belt and braces for callers that source an env file in between.
 readonly -f deploy_guard_on_main

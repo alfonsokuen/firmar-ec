@@ -1,5 +1,9 @@
 # PWA changelog
 
+## 0.28.4 — 2026-09-24
+
+- Motor de verificación 0.10.4: una CRL demasiado grande para leerla entera que puede ser indirecta, o cuyo emisor comparte nombre con una CA de la cadena, deja pendiente también la revisión de las CA (una respuesta en vivo sobre el firmante no la resuelve); sin aviso de «revocación no verificada» por CRL ajenas a la firma.
+
 ## 0.28.3 — 2026-09-24
 
 - Motor de verificación 0.10.3: si la revisión de revocación se corta por tiempo, tampoco se dan por comprobadas las CA de la cadena; el material de revocación omitido se atribuye por nombre del emisor (sin falsos avisos por CRL ajenas a la firma); nuevo aviso en español cuando el servicio de revocación ya no informa sobre un certificado caducado.

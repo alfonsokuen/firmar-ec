@@ -1,4 +1,6 @@
 import { webcrypto } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import * as asn1js from 'asn1js';
 import forge from 'node-forge';
 import * as pkijs from 'pkijs';
@@ -462,6 +464,8 @@ async function buildCrl(opts: {
   issuer?: Gen & { pkijsCert: pkijs.Certificate };
   /** Issuer name to write instead of the signing CA's subject (same key signs). */
   issuerName?: pkijs.RelativeDistinguishedNames;
+  /** Append one entry carrying certificateIssuer = this name (no IDP flag). */
+  certIssuerEntry?: pkijs.RelativeDistinguishedNames;
 }): Promise<Uint8Array> {
   const signerCa = opts.issuer ?? ca;
   const crl = new pkijs.CertificateRevocationList();
@@ -484,6 +488,27 @@ async function buildCrl(opts: {
       );
     }
     crl.revokedCertificates = [...(crl.revokedCertificates ?? []), ...pad];
+  }
+  if (opts.certIssuerEntry) {
+    const gn = new pkijs.GeneralNames({
+      names: [new pkijs.GeneralName({ type: 4, value: opts.certIssuerEntry })],
+    });
+    crl.revokedCertificates = [
+      ...(crl.revokedCertificates ?? []),
+      new pkijs.RevokedCertificate({
+        userCertificate: new asn1js.Integer({ value: 99 }),
+        revocationDate: new pkijs.Time({ type: 0, value: new Date(Date.now() - 10 * DAY) }),
+        crlEntryExtensions: new pkijs.Extensions({
+          extensions: [
+            new pkijs.Extension({
+              extnID: '2.5.29.29',
+              critical: true,
+              extnValue: gn.toSchema().toBER(false),
+            }),
+          ],
+        }),
+      }),
+    ];
   }
   if (opts.entries?.length) {
     crl.revokedCertificates = opts.entries.map(
@@ -778,6 +803,8 @@ describe('round 10 (Opus + Codex review of 0.10.2)', () => {
     const ltv = await ltvOf([], [big], new Date(Date.now() - DAY));
     expect(ltv.revocationIncomplete).toBeUndefined();
     expect(ltv.caRevocationIncomplete).toBeUndefined();
+    // ...and says nothing about skipping it (Opus, round 10).
+    expect(ltv.errors.join('|')).not.toMatch(/crl_too_large_skipped/);
   });
 
   test('oversized CRL naming the signer issuer with another string encoding -> signer link only', async () => {
@@ -821,5 +848,118 @@ describe('round 10 (Opus + Codex review of 0.10.2)', () => {
     const broken = good.slice(0, good.byteLength - 10);
     const ltv = await ltvOf([], [broken], new Date(Date.now() - DAY));
     expect(ltv.revocationIncomplete).toBe(true);
+  });
+});
+
+describe('round 11 (Codex + Opus review of 0.10.3)', () => {
+  const recently = () => new Date(Date.now() - DAY);
+
+  test('oversized INDIRECT CRL named after the signer issuer -> CA links stay open', async () => {
+    const big = await buildCrl({ indirect: true, padEntries: 5000 });
+    expect(big.byteLength).toBeGreaterThan(100_000);
+    const ltv = await ltvOf([], [big], recently());
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+
+  test('oversized CRL with an entry carrying certificateIssuer (no IDP flag) -> CA links stay open', async () => {
+    const other = await makeCert('OTHER ISSUER CA', 'b1', undefined, { ca: true });
+    const big = await buildCrl({ padEntries: 5000, certIssuerEntry: other.pkijsCert.subject });
+    expect(big.byteLength).toBeGreaterThan(100_000);
+    const ltv = await ltvOf([], [big], recently());
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+
+  test('oversized CRL with a plain (not indirect) IDP stays on the signer link (control)', async () => {
+    const big = await buildCrl({ plainIdp: true, padEntries: 5000 });
+    expect(big.byteLength).toBeGreaterThan(100_000);
+    const ltv = await ltvOf([], [big], recently());
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBeUndefined();
+  });
+
+  test('CA links sharing the signer issuer name (key rollover): an oversized CRL keeps the CA open', async () => {
+    const root = await makeCert('ROLL ROOT', 'b2');
+    const oldKey = await makeCert('ROLL CA', 'b3', root, { ca: true });
+    const newKey = await makeCert('ROLL CA', 'b4', oldKey, { ca: true });
+    const leaf = await makeCert('ROLL LEAF', 'b5', newKey);
+    // Issued by the older link: it is the one that would list a revoked newKey.
+    const big = await buildCrl({ issuer: oldKey, padEntries: 5000 });
+    expect(big.byteLength).toBeGreaterThan(100_000);
+    const ltv = await verifyLtv(
+      [leaf.pkijsCert, newKey.pkijsCert, oldKey.pkijsCert, root.pkijsCert],
+      { certs: [], ocsps: [], crls: [big], vri: {} },
+      new Uint8Array([1]),
+      new Uint8Array(0),
+      { proofTime: recently() },
+    );
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+
+  test('a tbsCertList longer than its enclosing CertificateList is not attributed', async () => {
+    const alg = [
+      0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b, 0x05, 0x00,
+    ];
+    const name = new Uint8Array(ca.pkijsCert.subject.toSchema().toBER(false));
+    const bogus = new Uint8Array(100_001);
+    // outer claims 256 bytes, the tbs inside it claims 512
+    bogus.set([0x30, 0x82, 0x01, 0x00, 0x30, 0x82, 0x02, 0x00], 0);
+    bogus.set(alg, 8);
+    bogus.set(name, 8 + alg.length);
+    // ...and is otherwise well formed (thisUpdate + an empty-looking entry
+    // list up to its claimed end), so only the length bound can reject it.
+    const at = 8 + alg.length + name.length;
+    bogus.set([0x17, 0x0d, ...new TextEncoder().encode('260101000000Z')], at);
+    const entriesLen = 8 + 0x200 - (at + 15 + 4);
+    bogus.set([0x30, 0x82, entriesLen >> 8, entriesLen & 0xff], at + 15);
+    const ltv = await ltvOf([], [bogus], recently());
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+});
+
+describe('round 11: real oversized CRL (Security Data SubCA-2, 1.19 MB)', () => {
+  test('a real full CRL of the signer issuer is not taken for indirect: CA links not tainted', async () => {
+    const der = new Uint8Array(
+      readFileSync(
+        fileURLToPath(
+          new URL(
+            '../../ltv-validation/tests/__fixtures__/securitydata-subca2-crl-2026-05-10.crl',
+            import.meta.url,
+          ),
+        ),
+      ),
+    );
+    expect(der.byteLength).toBeGreaterThan(100_000);
+    // Neither pkijs nor asn1js parse this real CRL whole: walk the headers
+    // (CertificateList > tbsCertList > version, signature) to the issuer.
+    const hdr = (at: number) => {
+      let len = der[at + 1]!;
+      let start = at + 2;
+      if (len & 0x80) {
+        const n = len & 0x7f;
+        len = 0;
+        for (let k = 0; k < n; k++) len = len * 256 + der[start + k]!;
+        start += n;
+      }
+      return { start, end: start + len };
+    };
+    const sigAlg = hdr(hdr(hdr(hdr(0).start).start).end);
+    const issuerDer = der.slice(sigAlg.end, hdr(sigAlg.end).end);
+    // Only the issuer NAME matters for a CRL skipped by size.
+    const issuerLink = pkijs.Certificate.fromBER(ca.pkijsCert.toSchema(true).toBER(false));
+    issuerLink.subject = new pkijs.RelativeDistinguishedNames({
+      schema: asn1js.fromBER(issuerDer.buffer).result,
+    });
+    expect(issuerLink.subject.typesAndValues.length).toBeGreaterThan(0);
+    const ltv = await verifyLtv(
+      [signer.pkijsCert, issuerLink],
+      { certs: [], ocsps: [], crls: [der], vri: {} },
+      new Uint8Array([1]),
+      new Uint8Array(0),
+      { proofTime: new Date(Date.now() - DAY) },
+    );
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBeUndefined();
   });
 });

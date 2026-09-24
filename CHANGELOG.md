@@ -16,6 +16,21 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Verificador — motor 0.10.4 (`@firma-ec/verifier` 1.2.4; PWA 0.28.4, verify-api 0.4.4) — 2026-09-24
+
+Revisión independiente de 0.10.3 (Opus: APPROVE; Codex: BLOCK con 2 HIGH, arreglados aquí).
+
+#### Security
+- Una CRL omitida por tamaño se atribuía solo al emisor del firmante sin saber si era **indirecta**. Ahora se recorren solo sus cabeceras DER (la lista de entradas se salta por longitud) para leer `issuingDistributionPoint.indirectCRL` y buscar `certificateIssuer` en las entradas; si puede ser indirecta, o no se puede leer, quedan pendientes también las CA. Antes, un `good` en vivo del firmante dejaba la firma `valid`.
+- El emisor de una CRL omitida se compara con **todos** los eslabones: si una CA comparte nombre con el emisor del firmante (renovación de clave), la coincidencia con la CA ya no queda tapada por la del emisor del firmante.
+
+#### Fixed
+- Una CRL grande de un emisor ajeno a la firma ya no añade el aviso `crl_too_large_skipped`, y el aviso ya no se repite por cada eslabón.
+- Los `scripts/deploy-*.sh` ejecutan la guarda **antes** de cargar `.deploy.env`: nada de lo que ese fichero defina (ni un envoltorio de `git`) llega a la comprobación.
+
+#### Tests
+- Regresiones: CRL grande indirecta y con `certificateIssuer` (y control con IDP no indirecto), cadena con dos eslabones del mismo nombre, CRL real de 1,19 MB de Security Data SubCA-2 (sigue atribuida solo al firmante), `tbsCertList` más largo que su contenedor, y el plazo real de 12 s de `verifyPdf` con temporizadores falsos. Cada una vista en rojo contra 0.10.3 o con una mutación.
+
 ### Verificador — motor 0.10.3 (`@firma-ec/verifier` 1.2.3; PWA 0.28.3, verify-api 0.4.3) — 2026-09-24
 
 Revisión independiente (Opus: APPROVE; Codex) de 0.10.2.

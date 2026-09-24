@@ -407,3 +407,32 @@ describe('round 10: live answer after expiry is reported as such (Opus)', () => 
     expect(codes).not.toContain('ocsp_unavailable');
   });
 });
+
+describe('round 11: the real 12 s LTV deadline (Opus)', () => {
+  test('verifyLtv never settles + live signer good -> revocation_unchecked', async () => {
+    withTimestampToken();
+    dss.data = { certs: [], ocsps: [new Uint8Array([0x30, 0x00])], crls: [], vri: {} };
+    verifyLtvMock.mockImplementation(() => new Promise(() => {}));
+    checkOcspMock.mockResolvedValue({
+      status: 'good',
+      source: 'live',
+      checkedAt: new Date().toISOString(),
+    });
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      let settled = false;
+      const pending = verifyPdf(await loadPdf()).finally(() => {
+        settled = true;
+      });
+      while (!settled) {
+        await vi.advanceTimersByTimeAsync(1_000);
+        await new Promise((r) => setImmediate(r));
+      }
+      const r = await pending;
+      expect(r.status).toBe('warning');
+      expect(r.warnings.map((w) => w.code)).toContain('revocation_unchecked');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

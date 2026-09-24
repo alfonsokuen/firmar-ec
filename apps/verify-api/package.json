@@ -1,6 +1,6 @@
 {
   "name": "@firma-ec/verify-api",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "private": true,
   "type": "module",
   "description": "Public PAdES verification API for firmar.ec — Fastify + @firma-ec/verifier. Handles NO private keys.",

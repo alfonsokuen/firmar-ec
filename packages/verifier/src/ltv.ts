@@ -177,44 +177,137 @@ function crlStillListsExpired(crl: pkijs.CertificateRevocationList, subject: Cer
 
 const OID_CERTIFICATE_ISSUER = '2.5.29.29';
 
-/**
- * The issuer Name of a DER CertificateList, read by walking only the headers
- * of the enclosing structures — never the (possibly huge) list of entries,
- * which is what makes an oversized CRL too slow to parse. Every element must
- * lie inside its parent; any other shape -> undefined.
- */
-function crlIssuerDer(der: Uint8Array): Uint8Array | undefined {
-  const header = (
-    at: number,
-    limit: number,
-  ): { tag: number; start: number; end: number } | undefined => {
-    if (at + 2 > limit) return undefined;
-    const tag = der[at]!;
-    let len = der[at + 1]!;
-    let start = at + 2;
-    if (len & 0x80) {
-      const n = len & 0x7f;
-      if (n === 0 || n > 4 || start + n > limit) return undefined;
-      len = 0;
-      for (let k = 0; k < n; k++) len = len * 256 + der[start + k]!;
-      start += n;
-    }
-    const end = start + len;
-    return end <= limit ? { tag, start, end } : undefined;
-  };
-  const outer = header(0, der.length);
-  if (!outer || outer.tag !== 0x30) return undefined;
-  const tbs = header(outer.start, outer.end);
-  if (!tbs || tbs.tag !== 0x30) return undefined;
-  let cur = header(tbs.start, tbs.end);
-  if (cur && cur.tag === 0x02) cur = header(cur.end, tbs.end); // optional version
-  if (!cur || cur.tag !== 0x30) return undefined; // signature AlgorithmIdentifier
-  const issuer = header(cur.end, tbs.end);
-  if (!issuer || issuer.tag !== 0x30) return undefined;
-  return der.slice(cur.end, issuer.end);
+type DerNode = { tag: number; start: number; end: number };
+
+/** One DER TLV header at `at`; the whole element must lie inside `limit`. */
+function derHeader(der: Uint8Array, at: number, limit: number): DerNode | undefined {
+  if (at + 2 > limit) return undefined;
+  const tag = der[at]!;
+  let len = der[at + 1]!;
+  let start = at + 2;
+  if (len & 0x80) {
+    const n = len & 0x7f;
+    if (n === 0 || n > 4 || start + n > limit) return undefined;
+    len = 0;
+    for (let k = 0; k < n; k++) len = len * 256 + der[start + k]!;
+    start += n;
+  }
+  const end = start + len;
+  return end <= limit ? { tag, start, end } : undefined;
 }
 
-/** Which link of `chain` a (possibly unparseable) CRL speaks for, by its issuer name. */
+/** The children of a constructed node, each read by its header only. */
+function derChildren(der: Uint8Array, node: DerNode): DerNode[] | undefined {
+  const out: DerNode[] = [];
+  for (let at = node.start; at < node.end; ) {
+    const child = derHeader(der, at, node.end);
+    if (!child) return undefined;
+    out.push(child);
+    at = child.end;
+  }
+  return out;
+}
+
+/**
+ * The fields of a DER CertificateList's tbsCertList from the issuer on, read
+ * by walking only headers: the (possibly huge) list of entries is stepped over
+ * by its length, never parsed — parsing it is what makes an oversized CRL too
+ * slow. Every element must lie inside its parent; any other shape -> undefined.
+ */
+function crlTbsFields(
+  der: Uint8Array,
+): { issuerTlv: [number, number]; afterIssuer: DerNode[] } | undefined {
+  const outer = derHeader(der, 0, der.length);
+  if (!outer || outer.tag !== 0x30) return undefined;
+  const tbs = derHeader(der, outer.start, outer.end);
+  if (!tbs || tbs.tag !== 0x30) return undefined;
+  const fields = derChildren(der, tbs);
+  if (!fields) return undefined;
+  let k = 0;
+  if (fields[k]?.tag === 0x02) k++; // optional version
+  const sigAlg = fields[k];
+  const issuer = fields[k + 1];
+  if (sigAlg?.tag !== 0x30 || issuer?.tag !== 0x30) return undefined;
+  // The issuer TLV begins where the AlgorithmIdentifier ends.
+  return { issuerTlv: [sigAlg.end, issuer.end], afterIssuer: fields.slice(k + 2) };
+}
+
+/** The issuer Name (full TLV) of a DER CertificateList, from its headers only. */
+function crlIssuerDer(der: Uint8Array): Uint8Array | undefined {
+  const f = crlTbsFields(der);
+  return f ? der.slice(f.issuerTlv[0], f.issuerTlv[1]) : undefined;
+}
+
+const CERTIFICATE_ISSUER_OID_TLV = [0x06, 0x03, 0x55, 0x1d, 0x1d];
+const IDP_OID_CONTENT = [0x55, 0x1d, 0x1c];
+
+function containsBytes(der: Uint8Array, from: number, to: number, pattern: number[]): boolean {
+  scan: for (let i = from; i + pattern.length <= to; i++) {
+    for (let k = 0; k < pattern.length; k++) if (der[i + k] !== pattern[k]) continue scan;
+    return true;
+  }
+  return false;
+}
+
+function contentIs(der: Uint8Array, node: DerNode, want: number[]): boolean {
+  if (node.end - node.start !== want.length) return false;
+  for (let k = 0; k < want.length; k++) if (der[node.start + k] !== want[k]) return false;
+  return true;
+}
+
+/** issuingDistributionPoint with indirectCRL set, among the crlExtensions [0]. */
+function idpSaysIndirect(der: Uint8Array, extsWrap: DerNode): boolean {
+  const extsSeq = derHeader(der, extsWrap.start, extsWrap.end);
+  if (!extsSeq || extsSeq.tag !== 0x30) return true;
+  const exts = derChildren(der, extsSeq);
+  if (!exts) return true;
+  for (const ext of exts) {
+    const parts = derChildren(der, ext);
+    const oid = parts?.[0];
+    if (!parts || oid?.tag !== 0x06) return true;
+    if (!contentIs(der, oid, IDP_OID_CONTENT)) continue;
+    const value = parts[parts.length - 1]!;
+    const idp = value.tag === 0x04 ? derHeader(der, value.start, value.end) : undefined;
+    const idpFields = idp?.tag === 0x30 ? derChildren(der, idp) : undefined;
+    if (!idpFields) return true;
+    // indirectCRL [4] IMPLICIT BOOLEAN
+    if (idpFields.some((n) => n.tag === 0x84 && (n.end === n.start || der[n.start] !== 0))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether a CRL too large to parse may be indirect (issuingDistributionPoint
+ * with indirectCRL, or an entry carrying certificateIssuer), from its headers
+ * only. The entries are searched byte-wise for the certificateIssuer OID: a
+ * stray match can only make the answer more cautious. Unreadable -> true.
+ */
+function crlMayBeIndirect(der: Uint8Array): boolean {
+  const f = crlTbsFields(der);
+  if (!f) return true;
+  // thisUpdate, [nextUpdate], [revokedCertificates], [[0] crlExtensions]
+  const rest = f.afterIssuer;
+  const isTime = (n: DerNode | undefined) => n?.tag === 0x17 || n?.tag === 0x18;
+  if (!isTime(rest[0])) return true;
+  let k = 1;
+  if (isTime(rest[k])) k++;
+  const entries = rest[k]?.tag === 0x30 ? rest[k++] : undefined;
+  const extsWrap = rest[k]?.tag === 0xa0 ? rest[k++] : undefined;
+  if (k !== rest.length) return true;
+  if (entries && containsBytes(der, entries.start, entries.end, CERTIFICATE_ISSUER_OID_TLV)) {
+    return true;
+  }
+  return extsWrap ? idpSaysIndirect(der, extsWrap) : false;
+}
+
+/**
+ * Which links of `chain` a (possibly unparseable) CRL may speak for, by its
+ * issuer name. A CA may share its name with the signer's issuer (key
+ * rollover): a match with any CA link keeps the CA links open, even when
+ * chain[1] matches too.
+ */
 function crlLink(der: Uint8Array, chain: Certificate[]): 'signer' | 'ca' | 'unrelated' | 'unknown' {
   const nameBytes = crlIssuerDer(der);
   if (!nameBytes) return 'unknown';
@@ -226,8 +319,8 @@ function crlLink(der: Uint8Array, chain: Certificate[]): 'signer' | 'ca' | 'unre
   } catch {
     return 'unknown';
   }
-  if (chain[1] && name.isEqual(chain[1].subject)) return 'signer';
   for (let k = 2; k < chain.length; k++) if (name.isEqual(chain[k]!.subject)) return 'ca';
+  if (chain[1] && name.isEqual(chain[1].subject)) return 'signer';
   return 'unrelated';
 }
 
@@ -583,11 +676,14 @@ export async function verifyLtv(
   // isEqual, not byte for byte): chain[1] issues the signer's cert, chain[k>=2]
   // a CA's. A CRL from outside this chain says nothing about it and is
   // ignored, as an unrelated small CRL is. Unreadable -> assume it matters.
-  const markCrlSkipped = (der: Uint8Array, alsoCa = false) => {
+  // An indirect CRL (or one that may be) is not confined to one link.
+  // Returns whether the CRL counted.
+  const markCrlSkipped = (der: Uint8Array, alsoCa = false): boolean => {
     const link = crlLink(der, chain);
-    if (link === 'unrelated' && !alsoCa) return;
+    if (link === 'unrelated' && !alsoCa) return false;
     sizeSkipped = true;
-    if (alsoCa || link !== 'signer') caSkipped = true;
+    if (alsoCa || link !== 'signer' || crlMayBeIndirect(der)) caSkipped = true;
+    return true;
   };
   const proofTime = _opts.proofTime ?? new Date();
 
@@ -665,8 +761,8 @@ export async function verifyLtv(
       // Skip CRLs too large to parse synchronously without blocking past the
       // watchdog. The profile is unaffected (derived from DSS presence).
       if (crlDer.byteLength > MAX_CRL_BYTES) {
-        markCrlSkipped(crlDer);
-        if (!errors.includes('crl_too_large_skipped')) {
+        const counted = markCrlSkipped(crlDer);
+        if (counted && !errors.some((e) => e.startsWith('crl_too_large_skipped'))) {
           errors.push(
             `crl_too_large_skipped: ${crlDer.byteLength} bytes (revocación a largo plazo no verificada en este dispositivo)`,
           );
