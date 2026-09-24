@@ -1,5 +1,13 @@
 # firma-ec — Deploy Log
 
+## PWA 0.28.0 + verify-api 0.4.0 — 2026-09-24 (motor de verificación 0.10.0, seguridad)
+
+- Imágenes: `firma-ec-pwa:0.28.0` (Swarm `firma-ec_pwa` 2/2 converged) y `firma-ec-verify:0.4.0` (1/1 converged). **Desplegadas a mano** (`scripts/deploy-pwa.sh`, `scripts/deploy-verify-api.sh`) desde la rama `fix/cadena-hoja-firmante` (`e240433`), NO por el CI: un push a `main` habría reconstruido también la landing desde `main`, que no contiene los commits de la landing en producción (`0.7.9-utm-ad4ff5a`, historia de GitHub `ad4ff5a`) y la habría revertido.
+- ⚠️ **`gitea/main` (`ebda614`) NO contiene lo desplegado.** Cualquier push a `main` redesplegaría la PWA con el motor 0.9.3 (vulnerable) y revertiría la landing. Antes del próximo push a `main`: integrar `fix/cadena-hoja-firmante` y la historia de landing `ad4ff5a` en `main`.
+- Qué arregla: el verificador validaba la cadena del último certificado del pool y no la del firmante (falso «Firma válida» con certificados forjados bajo una CA acreditada; falso «Firma inválida» en multifirma). Además: sellos RFC 3161 autenticados (`message-digest`), OCSP autenticado (incluidos respondedores delegados), revocación comparada con la hora probada y con evidencia DSS vigente, raíces X.509 v1 (APPFIRMAS 2025), sellos de cualquier ECI acreditada. Detalle en CHANGELOG raíz.
+- Verificado en producción: smoke de assets por content-type + control negativo; bundle servido con `0.28.0` y motor `0.10.0` (sin rastro de 0.9.3); E2E headless contra `app.firmar.ec`: contrato real UANATACA 2 firmas → «Firma válida» (2/2, sello MINTEL TSU02 reconocido, pie 0.28.0), PDF firmado con certificado forjado → «Firma inválida», 0 errores JS. API: `/livez` 200, `/healthz` 28/28 anclas, `POST /v1/verify` sin clave → 401, `openapi.json` público → 0.4.0, 0 errores en logs.
+- Rollback: `firma-ec-pwa:sha-ebda614d8e89` (imagen presente en el manager) y `firma-ec-verify:0.3.0@sha256:56153fd8…` (fijada por digest); `docker service rollback firma-ec_pwa` / `firma-ec-verify_verify`. Sin migraciones ni cambios de datos. Landing y handoff sin tocar.
+
 ## PWA 0.27.0 — 2026-09-14
 
 - Imagen inicial: firma-ec-pwa:sha-b5bb38a3296b. Pipeline Gitea 2927 correcto; PWA 2/2 réplicas, rollout completed.
