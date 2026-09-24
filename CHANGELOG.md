@@ -5,7 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
-### Verificador — motor 0.10.0 (`@firma-ec/verifier` 1.2.0, `@firma-ec/tsa-trust` 0.8.1, `@firma-ec/tsa-client` y `@firma-ec/ltv-validation` con cambios compatibles) — 2026-09-23
+### Verificador — motor 0.10.0 (`@firma-ec/verifier` 1.2.0, `@firma-ec/tsa-trust` 0.9.0, `@firma-ec/tsa-client` y `@firma-ec/ltv-validation` con cambios compatibles) — 2026-09-23
 
 #### Security
 - **La validación de cadena comprobaba un certificado distinto del firmante.** El motor de cadenas de
@@ -86,6 +86,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 - **Multifirma: una firma legítima salía «Firma inválida — emisor no reconocido».** Caso real: PDF con
   una firma de UANATACA CA2 2016 y otra de UANATACA CA2 2021; la hoja de la otra firma quedaba última
   en el pool y el motor validaba la cadena equivocada. Ahora ambas salen válidas.
+- **Sellos de tiempo de cualquier ECI acreditada por ARCOTEL.** Antes solo se reconocían FreeTSA y
+  UANATACA ROOT 2016, así que un sello de Security Data, del BCE o del TSU01 de UANATACA Ecuador (emitido
+  por CA2 2016) daba `chain_invalid` y no servía como prueba de la hora de firma. Ahora las raíces de la
+  TSL-EC que ya se usan para las firmas (solo las reales, con su huella verificada) y sus CA subordinadas
+  también anclan sellos, exigiendo siempre el EKU `timeStamping`. Es la lista de TSA que reconoce FirmaEC
+  desde su v4.2.0 (Darkcam, Security Data, ANFAC) más BCE, iCert y UANATACA EC.
 - **Sellos de tiempo de MINTEL TSU02 marcados como no válidos.** Su emisora, UANATACA CA2 2021, no
   estaba en el bundle de intermedias de TSA (solo CA1 2021).
 - El emisor usado para OCSP/CRL en «Validar certificado» se resuelve por AKI/SKI y firma, no por CN.

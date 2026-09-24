@@ -31,7 +31,12 @@ import {
   isProxied,
 } from '@firma-ec/ltv-validation';
 import { type ParsedTimestampToken, parseTimestampToken } from '@firma-ec/tsa-client';
-import { type TsaTrustRoot, validateTsaCertChain } from '@firma-ec/tsa-trust';
+import {
+  type AccreditedTsaAnchors,
+  type TsaTrustRoot,
+  validateTsaCertChain,
+} from '@firma-ec/tsa-trust';
+import { getIntermediates, getTrustRoots } from '@firma-ec/tsl-ec';
 import { fromBER } from 'asn1js';
 import { Certificate } from 'pkijs';
 
@@ -141,6 +146,53 @@ function getIssuerCN(cert: Certificate): string | null {
 }
 
 const OID_ID_CT_TST_INFO = '1.2.840.113549.1.9.16.1.4';
+
+let accreditedCache: Promise<AccreditedTsaAnchors> | null = null;
+
+/**
+ * ARCOTEL-accredited ECIs also run the accredited timestamping services
+ * (Security Data, BCE, UANATACA EC, …): their TSU certificates chain to the
+ * same TSL roots the verifier pins for signatures. Offer those roots — only
+ * real ones whose fingerprint matches the TSL, as in validatePath — and the
+ * bundled subordinate CAs as extra TSA anchors, so a timestamp from any
+ * accredited ECI is recognised without listing every TSA by hand.
+ */
+export function accreditedTsaAnchors(): Promise<AccreditedTsaAnchors> {
+  accreditedCache ??= (async () => {
+    const anchors: Certificate[] = [];
+    for (const r of await getTrustRoots()) {
+      if (r.isPlaceholder) continue;
+      try {
+        const der = pemToDerLocal(r.pemContent);
+        const fp = Array.from(
+          new Uint8Array(await crypto.subtle.digest('SHA-256', toAb(der))),
+          (b) => b.toString(16).padStart(2, '0'),
+        ).join('');
+        if (fp !== r.fingerprintSha256) continue;
+        anchors.push(new Certificate({ schema: fromBER(toAb(der)).result }));
+      } catch {
+        /* skip an unparseable root, as validatePath does */
+      }
+    }
+    const intermediates: Certificate[] = [];
+    for (const it of await getIntermediates()) {
+      try {
+        intermediates.push(
+          new Certificate({ schema: fromBER(toAb(pemToDerLocal(it.pemContent))).result }),
+        );
+      } catch {
+        /* skip unparseable */
+      }
+    }
+    return { anchors, intermediates };
+  })();
+  return accreditedCache;
+}
+
+function pemToDerLocal(pem: string): Uint8Array {
+  const b64 = pem.replace(/-----BEGIN [A-Z ]+-----|-----END [A-Z ]+-----|\s/g, '');
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
 
 /**
  * Verify the TSA's inner SignerInfo signature over its signedAttrs DER.
@@ -386,7 +438,8 @@ export async function verifyTimestamp(
       // ignore unparseable intermediates
     }
   }
-  let chain = await validateTsaCertChain(tsaCertObj, intermediates, parsed.signingTime);
+  const accredited = await accreditedTsaAnchors();
+  let chain = await validateTsaCertChain(tsaCertObj, intermediates, parsed.signingTime, accredited);
 
   // F2 AIA self-heal — only when the local bundle (embedded + tsa-trust's
   // own intermediates) still didn't complete the chain, and the caller
@@ -424,7 +477,12 @@ export async function verifyTimestamp(
         const asn = fromBER(toAb(aiaResult.certDer));
         if (asn.offset !== -1) {
           intermediates.push(new Certificate({ schema: asn.result }));
-          chain = await validateTsaCertChain(tsaCertObj, intermediates, parsed.signingTime);
+          chain = await validateTsaCertChain(
+            tsaCertObj,
+            intermediates,
+            parsed.signingTime,
+            accredited,
+          );
         }
       } catch {
         // Malformed AIA response — keep the original chain_invalid result.

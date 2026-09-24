@@ -170,10 +170,23 @@ function hasTimeStampingEku(cert: Certificate): boolean {
  *   3. pkijs CertificateChainValidationEngine resolves a path tsaCert (+
  *      intermediates) → trusted root.
  */
+/**
+ * Extra anchors the caller vouches for — in practice the ARCOTEL TSL roots
+ * the verifier already pins for signatures (with their subordinate CAs), so
+ * that timestamps from any accredited ECI chain without this package listing
+ * every TSA (Security Data, BCE, UANATACA EC TSU01 under CA2 2016, …). The
+ * timeStamping EKU requirement applies unchanged.
+ */
+export interface AccreditedTsaAnchors {
+  anchors: Certificate[];
+  intermediates: Certificate[];
+}
+
 export async function validateTsaCertChain(
   tsaCert: ParsedCertLike,
   intermediates: Certificate[] = [],
   atTime: Date = new Date(),
+  accredited?: AccreditedTsaAnchors,
 ): Promise<ChainValidationResult> {
   // 1. EKU check
   if (!hasTimeStampingEku(tsaCert.certificate)) {
@@ -195,7 +208,8 @@ export async function validateTsaCertChain(
 
   // 3. Chain build
   const roots = getTsaTrustRoots().filter((r) => !r.isPlaceholder);
-  if (roots.length === 0) {
+  const extraAnchors = accredited?.anchors ?? [];
+  if (roots.length === 0 && extraAnchors.length === 0) {
     return {
       ok: false,
       reason: 'placeholder_only',
@@ -203,7 +217,7 @@ export async function validateTsaCertChain(
     };
   }
 
-  const trustedCerts = roots.map((r) => r.certificate);
+  const trustedCerts = [...roots.map((r) => r.certificate), ...extraAnchors];
 
   // 2026-08-06 — always offer the bundled TSA-issuing intermediates too, in
   // addition to whatever the caller found embedded in the token itself. Real
@@ -220,7 +234,11 @@ export async function validateTsaCertChain(
   const isTsaCert = (c: Certificate): boolean =>
     c.tbsView.byteLength === tsaTbs.byteLength && c.tbsView.every((b, i) => b === tsaTbs[i]);
   const certPool = [
-    ...[...intermediates, ...getTsaTrustIntermediates()].filter((c) => !isTsaCert(c)),
+    ...[
+      ...intermediates,
+      ...getTsaTrustIntermediates(),
+      ...(accredited?.intermediates ?? []),
+    ].filter((c) => !isTsaCert(c)),
     tsaCert.certificate,
   ];
 

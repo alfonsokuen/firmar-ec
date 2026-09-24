@@ -27,6 +27,13 @@ const FIXTURE_UANATACA_TSU01 = resolve(__dirname, '__fixtures__/uanataca-tsu01-l
 // Public TSA certificate of MINTEL's accredited timestamping unit (a service
 // cert, no personal data), issued by UANATACA CA2 2021.
 const FIXTURE_MINTEL_TSU02 = resolve(__dirname, '__fixtures__/mintel-tsu02-leaf.der');
+// Official public TSA certificate of UANATACA Ecuador (TSU01), issued by UANATACA CA2 2016.
+const FIXTURE_UANATACA_EC_TSU01 = resolve(__dirname, '__fixtures__/uanataca-ec-tsu01-leaf.der');
+
+function pemFileToDer(rel: string): Uint8Array {
+  const pem = readFileSync(resolve(__dirname, rel), 'utf8');
+  return Uint8Array.from(Buffer.from(pem.replace(/-----[A-Z ]+-----|\s/g, ''), 'base64'));
+}
 
 function derToCert(der: Uint8Array): ParsedCertLike {
   const ab = der.buffer.slice(der.byteOffset, der.byteOffset + der.byteLength) as ArrayBuffer;
@@ -119,6 +126,30 @@ describe('validateTsaCertChain', () => {
     const result = await validateTsaCertChain(tsaCert, []);
     expect(result).toMatchObject({ ok: true });
     expect(result.matchedRoot?.slug).toBe('uanataca');
+  });
+
+  it('accepts a TSA under an ARCOTEL-accredited anchor supplied by the caller (UANATACA EC TSU01, issued by CA2 2016)', async () => {
+    // Official cert from web.uanataca.com/ec/certificados-ca (2026-09-24).
+    // Its issuer, UANATACA CA2 2016, is in the ARCOTEL TSL bundle but not in
+    // this package's own TSA list: the verifier supplies the TSL anchors.
+    const tsaCert = derToCert(new Uint8Array(readFileSync(FIXTURE_UANATACA_EC_TSU01)));
+    const ca2016 = derToCert(pemFileToDer('../../tsl-ec/src/intermediates/uanataca-ca2-2016.pem'));
+    const root = derToCert(pemFileToDer('../../tsl-ec/src/roots/uanataca-2024.pem'));
+    const result = await validateTsaCertChain(tsaCert, [], new Date(), {
+      anchors: [root.certificate],
+      intermediates: [ca2016.certificate],
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('caller-supplied anchors never lift the timeStamping EKU requirement', async () => {
+    const notATsa = derToCert(pemFileToDer('../../tsl-ec/src/intermediates/uanataca-ca2-2016.pem'));
+    const root = derToCert(pemFileToDer('../../tsl-ec/src/roots/uanataca-2024.pem'));
+    const result = await validateTsaCertChain(notATsa, [], new Date(), {
+      anchors: [root.certificate],
+      intermediates: [],
+    });
+    expect(result).toMatchObject({ ok: false, reason: 'tsa_eku_missing' });
   });
 
   it('rejects with tsa_eku_missing when EKU is absent', async () => {
