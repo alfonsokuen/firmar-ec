@@ -14,7 +14,7 @@ import { parseCms } from './cms';
 import { extractDss } from './dss';
 import { VerificationError } from './errors';
 import { buildCoveredBytes, checkDocumentIntegrity, verifySignatureValue } from './integrity';
-import { verifyLtv } from './ltv';
+import { ltvTimeoutSummary, verifyLtv } from './ltv';
 import { checkOcsp } from './ocsp';
 import { validatePath } from './pathValidation';
 import { type SignedRange, findAllSignatures, findSignature } from './pdf';
@@ -43,7 +43,7 @@ export type { CertCheckResult, CertCheckOptions } from './certCheck';
 
 // Bump on each release (kept hardcoded — JSON imports require resolveJsonModule
 // + downstream tsconfig coupling we'd rather avoid in this package).
-export const ENGINE_VERSION = '0.10.2';
+export const ENGINE_VERSION = '0.10.3';
 
 /**
  * Dedupe a certificate list by DER fingerprint. Used to merge intermediates
@@ -444,22 +444,7 @@ async function verifyOneSignature(
         proofTime: proofOfExistence ?? new Date(),
       }),
       new Promise<import('./ltv').LtvSummary>((resolve) =>
-        setTimeout(() => {
-          const d = dssOutcome.data;
-          const ocspN = d?.ocsps?.length ?? 0;
-          const crlN = d?.crls?.length ?? 0;
-          resolve({
-            profile: ocspN > 0 || crlN > 0 ? 'B-LT' : 'B-T',
-            dssPresent: d !== undefined,
-            embeddedOcspCount: ocspN,
-            embeddedCrlCount: crlN,
-            retrospectiveValid: false,
-            revocationIncomplete: true,
-            errors: [
-              'ltv_timeout: validación de revocación a largo plazo excedió el tiempo en este dispositivo',
-            ],
-          });
-        }, 12_000),
+        setTimeout(() => resolve(ltvTimeoutSummary(dssOutcome.data)), 12_000),
       ),
     ]);
 
@@ -587,10 +572,18 @@ async function verifyOneSignature(
       // 'not_checked' means we deliberately skipped (B-B profile or fetch
       // disabled) — not a finding worth surfacing.
       status = 'warning';
-      warnings.push({
-        code: 'ocsp_unavailable',
-        message: 'OCSP responder did not return a definitive status for this certificate.',
-      });
+      warnings.push(
+        ocsp.reason === 'ocsp_after_expiry'
+          ? {
+              code: 'ocsp_after_expiry',
+              message:
+                'El certificado del firmante ya caducó y el servicio de revocación responde por el estado actual, no por la fecha de la firma: no se pudo confirmar que no estuviera revocado cuando se firmó.',
+            }
+          : {
+              code: 'ocsp_unavailable',
+              message: 'OCSP responder did not return a definitive status for this certificate.',
+            },
+      );
     } else {
       status = 'valid';
     }

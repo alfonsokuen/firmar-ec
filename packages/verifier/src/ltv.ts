@@ -177,47 +177,58 @@ function crlStillListsExpired(crl: pkijs.CertificateRevocationList, subject: Cer
 
 const OID_CERTIFICATE_ISSUER = '2.5.29.29';
 
-function nameDer(name: pkijs.RelativeDistinguishedNames): Uint8Array {
-  return new Uint8Array(name.toSchema().toBER(false));
-}
-
-function bytesEq(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.byteLength !== b.byteLength) return false;
-  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
 /**
  * The issuer Name of a DER CertificateList, read by walking only the headers
- * of the outer structures — never the (possibly huge) list of entries, which
- * is exactly what makes an oversized CRL too slow to parse. undefined when
- * the shape is not the expected one.
+ * of the enclosing structures — never the (possibly huge) list of entries,
+ * which is what makes an oversized CRL too slow to parse. Every element must
+ * lie inside its parent; any other shape -> undefined.
  */
 function crlIssuerDer(der: Uint8Array): Uint8Array | undefined {
-  const header = (at: number): { tag: number; start: number; end: number } | undefined => {
-    if (at + 2 > der.length) return undefined;
+  const header = (
+    at: number,
+    limit: number,
+  ): { tag: number; start: number; end: number } | undefined => {
+    if (at + 2 > limit) return undefined;
     const tag = der[at]!;
     let len = der[at + 1]!;
     let start = at + 2;
     if (len & 0x80) {
       const n = len & 0x7f;
-      if (n === 0 || n > 4 || start + n > der.length) return undefined;
+      if (n === 0 || n > 4 || start + n > limit) return undefined;
       len = 0;
       for (let k = 0; k < n; k++) len = len * 256 + der[start + k]!;
       start += n;
     }
-    return { tag, start, end: start + len };
+    const end = start + len;
+    return end <= limit ? { tag, start, end } : undefined;
   };
-  const outer = header(0);
+  const outer = header(0, der.length);
   if (!outer || outer.tag !== 0x30) return undefined;
-  const tbs = header(outer.start);
+  const tbs = header(outer.start, outer.end);
   if (!tbs || tbs.tag !== 0x30) return undefined;
-  let cur = header(tbs.start);
-  if (cur && cur.tag === 0x02) cur = header(cur.end); // optional version
+  let cur = header(tbs.start, tbs.end);
+  if (cur && cur.tag === 0x02) cur = header(cur.end, tbs.end); // optional version
   if (!cur || cur.tag !== 0x30) return undefined; // signature AlgorithmIdentifier
-  const issuer = header(cur.end);
-  if (!issuer || issuer.tag !== 0x30 || issuer.end > der.length) return undefined;
+  const issuer = header(cur.end, tbs.end);
+  if (!issuer || issuer.tag !== 0x30) return undefined;
   return der.slice(cur.end, issuer.end);
+}
+
+/** Which link of `chain` a (possibly unparseable) CRL speaks for, by its issuer name. */
+function crlLink(der: Uint8Array, chain: Certificate[]): 'signer' | 'ca' | 'unrelated' | 'unknown' {
+  const nameBytes = crlIssuerDer(der);
+  if (!nameBytes) return 'unknown';
+  let name: pkijs.RelativeDistinguishedNames;
+  try {
+    const asn = asn1js.fromBER(nameBytes.slice().buffer);
+    if (asn.offset === -1) return 'unknown';
+    name = new pkijs.RelativeDistinguishedNames({ schema: asn.result });
+  } catch {
+    return 'unknown';
+  }
+  if (chain[1] && name.isEqual(chain[1].subject)) return 'signer';
+  for (let k = 2; k < chain.length; k++) if (name.isEqual(chain[k]!.subject)) return 'ca';
+  return 'unrelated';
 }
 
 /** issuingDistributionPoint.indirectCRL, or any entry carrying certificateIssuer. */
@@ -248,6 +259,27 @@ function crlScopeUnsupported(crl: pkijs.CertificateRevocationList): boolean {
   return (crl.crlExtensions?.extensions ?? []).some(
     (e) => e.extnID === OID_ISSUING_DISTRIBUTION_POINT || e.extnID === OID_DELTA_CRL_INDICATOR,
   );
+}
+
+/**
+ * What the caller reports when verifyLtv does not settle within its deadline:
+ * nothing was established about revocation, for any link of the chain.
+ */
+export function ltvTimeoutSummary(d: DssData | undefined): LtvSummary {
+  const ocspN = d?.ocsps?.length ?? 0;
+  const crlN = d?.crls?.length ?? 0;
+  return {
+    profile: ocspN > 0 || crlN > 0 ? 'B-LT' : 'B-T',
+    dssPresent: d !== undefined,
+    embeddedOcspCount: ocspN,
+    embeddedCrlCount: crlN,
+    retrospectiveValid: false,
+    revocationIncomplete: true,
+    caRevocationIncomplete: true,
+    errors: [
+      'ltv_timeout: validación de revocación a largo plazo excedió el tiempo en este dispositivo',
+    ],
+  };
 }
 
 export function toLtvParsedCert(cert: Certificate): LtvParsedCert {
@@ -547,11 +579,15 @@ export async function verifyLtv(
   let sizeSkipped = false;
   // Skipped material that concerns (or may concern) a CA link, not the signer's issuer.
   let caSkipped = false;
-  const signerIssuerDer = chain[1] ? nameDer(chain[1].subject) : undefined;
-  const markCrlSkipped = (der: Uint8Array) => {
+  // A skipped CRL is attributed by its issuer name (compared like pkijs's
+  // isEqual, not byte for byte): chain[1] issues the signer's cert, chain[k>=2]
+  // a CA's. A CRL from outside this chain says nothing about it and is
+  // ignored, as an unrelated small CRL is. Unreadable -> assume it matters.
+  const markCrlSkipped = (der: Uint8Array, alsoCa = false) => {
+    const link = crlLink(der, chain);
+    if (link === 'unrelated' && !alsoCa) return;
     sizeSkipped = true;
-    const issuer = crlIssuerDer(der);
-    if (!issuer || !signerIssuerDer || !bytesEq(issuer, signerIssuerDer)) caSkipped = true;
+    if (alsoCa || link !== 'signer') caSkipped = true;
   };
   const proofTime = _opts.proofTime ?? new Date();
 
@@ -638,7 +674,11 @@ export async function verifyLtv(
         continue;
       }
       const crl = parseCrlCached(idx, crlDer);
-      if (!crl) continue;
+      if (!crl) {
+        // Could not be read at all: it may list the revocation we look for.
+        markCrlSkipped(crlDer);
+        continue;
+      }
       // DSS material can be appended after signing by anyone: only a CRL the
       // subject's issuer actually signed says anything about the subject.
       if (!(await crlIssuedBy(crl, issuer))) continue;
@@ -650,7 +690,7 @@ export async function verifyLtv(
       // (certificateIssuer); matching by serial alone could revoke the wrong
       // cert. Not modelled: left unread, the check stays incomplete.
       if (crlIsIndirect(crl)) {
-        markCrlSkipped(crlDer);
+        markCrlSkipped(crlDer, true); // an indirect CRL is not confined to one link
         continue;
       }
       const found = isCertRevoked(parseCert(subject), crl);

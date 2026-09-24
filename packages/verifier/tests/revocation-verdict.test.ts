@@ -390,3 +390,20 @@ describe('round 9: a signer answer does not settle unchecked CA links (Codex)', 
     expect(r.warnings.map((w) => w.code)).not.toContain('revocation_unchecked');
   });
 });
+
+describe('round 10: live answer after expiry is reported as such (Opus)', () => {
+  test('ocsp_after_expiry -> its own warning code, not ocsp_unavailable', async () => {
+    withTimestampToken();
+    checkOcspMock.mockResolvedValue({
+      status: 'unknown',
+      source: 'live',
+      checkedAt: new Date().toISOString(),
+      reason: 'ocsp_after_expiry',
+    });
+    const r = await verifyPdf(await loadPdf());
+    const codes = r.warnings.map((w) => w.code);
+    expect(r.status).toBe('warning');
+    expect(codes).toContain('ocsp_after_expiry');
+    expect(codes).not.toContain('ocsp_unavailable');
+  });
+});

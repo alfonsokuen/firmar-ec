@@ -3,7 +3,7 @@ import * as asn1js from 'asn1js';
 import forge from 'node-forge';
 import * as pkijs from 'pkijs';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-import { verifyLtv } from '../src/ltv';
+import { ltvTimeoutSummary, verifyLtv } from '../src/ltv';
 import { checkOcsp } from '../src/ocsp';
 
 /**
@@ -460,12 +460,14 @@ async function buildCrl(opts: {
   expiredCertsOnCrl?: Date;
   thisUpdate?: Date;
   issuer?: Gen & { pkijsCert: pkijs.Certificate };
+  /** Issuer name to write instead of the signing CA's subject (same key signs). */
+  issuerName?: pkijs.RelativeDistinguishedNames;
 }): Promise<Uint8Array> {
   const signerCa = opts.issuer ?? ca;
   const crl = new pkijs.CertificateRevocationList();
   crl.version = 1;
   crl.signature.algorithmId = '1.2.840.113549.1.1.11';
-  crl.issuer = signerCa.pkijsCert.subject;
+  crl.issuer = opts.issuerName ?? signerCa.pkijsCert.subject;
   crl.thisUpdate = new pkijs.Time({
     type: 0,
     value: opts.thisUpdate ?? new Date(Date.now() - 60_000),
@@ -721,6 +723,9 @@ describe('round 9 (Codex review of 0.10.1)', () => {
     const der = new Uint8Array(parsed.toSchema(true).toBER(false));
     const ltv = await ltvOf([], [der], new Date(Date.now() - DAY));
     expect(ltv.signerRevocation).toBeUndefined();
+    // Left unread, it keeps the check open — for the CA links too.
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBe(true);
   });
 
   test('skipped oversized CRL of a CA link is reported apart from the signer link', async () => {
@@ -745,5 +750,76 @@ describe('round 9 (Codex review of 0.10.1)', () => {
     const ltv = await ltvOf([], [bigCaCrl], new Date(Date.now() - DAY));
     expect(ltv.revocationIncomplete).toBe(true);
     expect(ltv.caRevocationIncomplete).toBeUndefined();
+  });
+});
+
+describe('round 10 (Opus + Codex review of 0.10.2)', () => {
+  test('the 12 s LTV deadline leaves CA links unchecked too', () => {
+    const summary = ltvTimeoutSummary({
+      certs: [],
+      ocsps: [new Uint8Array([1])],
+      crls: [],
+      vri: {},
+    });
+    expect(summary.revocationIncomplete).toBe(true);
+    expect(summary.caRevocationIncomplete).toBe(true);
+  });
+
+  test('an oversized OCSP response cannot be attributed -> CA links incomplete', async () => {
+    const ltv = await ltvOf([new Uint8Array(100_001)], []);
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+
+  test('an oversized CRL from an issuer outside this chain is ignored (no false warning)', async () => {
+    const stranger = await makeCert('STRANGER CA', 'a0', undefined, { ca: true });
+    const big = await buildCrl({ issuer: stranger, padEntries: 5000 });
+    expect(big.byteLength).toBeGreaterThan(100_000);
+    const ltv = await ltvOf([], [big], new Date(Date.now() - DAY));
+    expect(ltv.revocationIncomplete).toBeUndefined();
+    expect(ltv.caRevocationIncomplete).toBeUndefined();
+  });
+
+  test('oversized CRL naming the signer issuer with another string encoding -> signer link only', async () => {
+    // Same name, other string type (UTF8String <-> PrintableString): equal for
+    // RFC 5280 name matching (and pkijs isEqual), not byte-equal.
+    const tv = ca.pkijsCert.subject.typesAndValues[0]!;
+    const text = (tv.value as unknown as { valueBlock: { value: string } }).valueBlock.value;
+    const other =
+      tv.value instanceof asn1js.Utf8String
+        ? new asn1js.PrintableString({ value: text })
+        : new asn1js.Utf8String({ value: text });
+    const issuerName = new pkijs.RelativeDistinguishedNames({
+      typesAndValues: [
+        new pkijs.AttributeTypeAndValue({
+          type: tv.type,
+          value: other as unknown as asn1js.Utf8String,
+        }),
+      ],
+    });
+    expect(new Uint8Array(issuerName.toSchema().toBER(false)).join()).not.toBe(
+      new Uint8Array(ca.pkijsCert.subject.toSchema().toBER(false)).join(),
+    );
+    const big = await buildCrl({ padEntries: 5000, issuerName });
+    expect(big.byteLength).toBeGreaterThan(100_000);
+    const ltv = await ltvOf([], [big], new Date(Date.now() - DAY));
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBeUndefined();
+  });
+
+  test('malformed CRL whose headers claim zero-length containers is not attributed to the signer', async () => {
+    const name = new Uint8Array(ca.pkijsCert.subject.toSchema().toBER(false));
+    const bogus = new Uint8Array(100_001);
+    bogus.set([0x30, 0x00, 0x30, 0x00, 0x30, 0x00], 0);
+    bogus.set(name, 6);
+    const ltv = await ltvOf([], [bogus], new Date(Date.now() - DAY));
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+
+  test('a small CRL that cannot be parsed is not silently dropped', async () => {
+    const good = await buildCrl({});
+    const broken = good.slice(0, good.byteLength - 10);
+    const ltv = await ltvOf([], [broken], new Date(Date.now() - DAY));
+    expect(ltv.revocationIncomplete).toBe(true);
   });
 });
