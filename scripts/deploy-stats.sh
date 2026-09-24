@@ -18,8 +18,8 @@ if [[ -z "$VERSION" ]]; then
 fi
 [[ -z "$VERSION" ]] && { echo "ERROR: no pude determinar la version"; exit 1; }
 
+. "$REPO_ROOT/scripts/_deploy-guard.sh" # before the env file: see the bypass note there
 . "$REPO_ROOT/scripts/_deploy-env.sh"
-. "$REPO_ROOT/scripts/_deploy-guard.sh"
 deploy_guard_on_main || exit 1
 IMAGE="$REGISTRY/firma-ec-stats:$VERSION"
 STACK_FILE="infra/compose/stack-firma-ec-stats.deploy.yml"

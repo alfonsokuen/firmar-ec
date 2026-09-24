@@ -126,3 +126,37 @@ describe('deploy guard', () => {
     expect(r.code).toBe(1);
   });
 });
+
+describe('deploy guard: the bypass cannot come from a sourced env file (Codex)', () => {
+  const offMain = () => {
+    const { work } = repoWithRemote();
+    git(work, 'switch', '-q', '-c', 'feature');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
+    git(work, 'add', '.');
+    git(work, 'commit', '-q', '-m', 'off main');
+    return work;
+  };
+  // Mirrors the deploy scripts: guard sourced first, then the env file, then the check.
+  const runWithEnvFile = (cwd: string, envLines: string) => {
+    const envPath = join(cwd, '..', 'deploy.env.test');
+    writeFileSync(envPath, envLines);
+    const g = GUARD.replace(/\\/g, '/');
+    const e = envPath.replace(/\\/g, '/');
+    const r = spawnSync('bash', ['-c', `set -e; . "${g}"; . "${e}"; deploy_guard_on_main`], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, ALLOW_OFF_MAIN_DEPLOY: '' },
+    });
+    return r.status;
+  };
+
+  for (const line of [
+    'export "ALLOW_OFF_MAIN_DEPLOY=1"',
+    'declare -x ALLOW_OFF_MAIN_DEPLOY=1',
+    'ALLOW_OFF_MAIN_DEPLOY=1',
+  ]) {
+    test(`env file with \`${line}\` -> refused`, () => {
+      expect(runWithEnvFile(offMain(), `${line}\n`)).not.toBe(0);
+    });
+  }
+});

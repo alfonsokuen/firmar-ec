@@ -17,10 +17,14 @@
 # persisted — a bypass left in .deploy.env would silently disable the guard
 # for every later deploy, so that is refused. The bypass is loud.
 #
-# Usage (sourced after _deploy-env.sh):  deploy_guard_on_main
+# Usage: source this file BEFORE _deploy-env.sh, call deploy_guard_on_main after it.
 
 readonly DEPLOY_GUARD_REMOTE=gitea
 readonly DEPLOY_GUARD_BRANCH=main
+# Captured when this file is sourced, i.e. BEFORE _deploy-env.sh loads
+# .deploy.env: whatever that file sets or exports (in any bash syntax) can no
+# longer turn the bypass on. Readonly, so it cannot be reassigned either.
+readonly _DEPLOY_GUARD_BYPASS="${ALLOW_OFF_MAIN_DEPLOY:-}"
 
 deploy_guard_on_main() {
   local ref="$DEPLOY_GUARD_REMOTE/$DEPLOY_GUARD_BRANCH"
@@ -32,7 +36,7 @@ deploy_guard_on_main() {
     echo "RECHAZADO: ALLOW_OFF_MAIN_DEPLOY esta fijado en .deploy.env; la excepcion va solo en la linea de comandos." >&2
     return 1
   fi
-  [[ "${ALLOW_OFF_MAIN_DEPLOY:-}" == "1" ]] && bypass=1
+  [[ "$_DEPLOY_GUARD_BYPASS" == "1" ]] && bypass=1
 
   if [[ -n "$(git status --porcelain)" ]]; then
     if [[ "$bypass" == 1 ]]; then
