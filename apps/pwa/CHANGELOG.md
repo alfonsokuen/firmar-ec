@@ -1,5 +1,9 @@
 # PWA changelog
 
+## 0.28.2 — 2026-09-24
+
+- Motor de verificación 0.10.2 (seguridad): el OCSP en vivo tampoco acepta un «no revocado» emitido después de caducar el certificado; material de revocación omitido que afecta a una CA de la cadena ya no se da por resuelto con la respuesta del firmante; las CRL indirectas no se interpretan por número de serie.
+
 ## 0.28.1 — 2026-09-24
 
 - Motor de verificación 0.10.1 (seguridad), tras una revisión independiente de lo desplegado en 0.28.0: una revocación listada en una CRL con alcance parcial o delta vuelve a contar (incluidas las ARL de CA, que se descartaban); la evidencia de «no revocado» emitida después de caducar el certificado ya no cuenta; material de revocación omitido obliga a consultar el OCSP en vivo; un certificado de sellado de tiempo debe tener `timeStamping` como único uso extendido y crítico.

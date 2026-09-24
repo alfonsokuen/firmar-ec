@@ -16,6 +16,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Verificador — motor 0.10.2 (`@firma-ec/verifier` 1.2.2; PWA 0.28.2, verify-api 0.4.2) — 2026-09-24
+
+Revisión independiente (Codex) de 0.10.1.
+
+#### Security
+- El **OCSP en vivo** tampoco acepta un `good` producido después de caducar el certificado (`ocsp_after_expiry`); 0.10.1 solo lo aplicaba a la evidencia embebida.
+- **Material omitido de una CA** (CRL demasiado grande cuyo emisor no es el del firmante, o no atribuible): la respuesta OCSP en vivo del firmante ya no lo da por resuelto; queda `revocation_unchecked`. El emisor de la CRL omitida se lee recorriendo solo las cabeceras DER, sin parsear sus entradas.
+- **CRL indirectas** (`indirectCRL`, o entradas con `certificateIssuer`): no se interpretan por número de serie, porque la entrada puede ser de otro emisor; quedan como material no evaluado. Regresión de 0.10.1, que al volver a leer CRL con alcance podía revocar al certificado equivocado.
+- **Guarda de deploy**: la excepción se captura antes de cargar `.deploy.env`, en una variable de solo lectura, así que ese fichero no puede activarla con ninguna sintaxis (`export "…"`, `declare -x`, asignación simple).
+
 ### Verificador — motor 0.10.1 (`@firma-ec/verifier` 1.2.1, `@firma-ec/tsa-trust` 0.9.1; PWA 0.28.1, verify-api 0.4.1) — 2026-09-24
 
 Revisión independiente (Opus, Codex) de lo desplegado como 0.10.0.
