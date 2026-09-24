@@ -4,24 +4,38 @@
 # Why (2026-09-24): the landing went live as 0.7.9-utm-ad4ff5a from GitHub
 # main (PRs #2 and #3) while Gitea main — the branch the CI deploys — stayed
 # 10 commits behind. Production ran code no CI branch had, and the next push
-# to Gitea main would have silently reverted it. The same day a security
-# release had to go out by hand for the same reason, widening the gap.
+# to Gitea main would have silently reverted it. GitHub is only a push-mirror
+# of Gitea; the source is gitea/main.
 #
-# Guard: the commit being deployed must already be on <remote>/main and the
+# Guard: the commit being deployed must be the TIP of gitea/main (the CI would
+# ship exactly that; an older main commit would roll production back) and the
 # working tree must be clean (the deploy scripts tar the directory as is, so
-# uncommitted changes would ship too). An emergency bypass is explicit and
-# loud: ALLOW_OFF_MAIN_DEPLOY=1 prints what is being shipped off main.
+# uncommitted changes would ship too). Remote and branch are fixed on purpose:
+# pointing the guard at a mirror is how the drift happened.
+#
+# Emergency bypass: ALLOW_OFF_MAIN_DEPLOY=1 on the command line, never
+# persisted — a bypass left in .deploy.env would silently disable the guard
+# for every later deploy, so that is refused. The bypass is loud.
 #
 # Usage (sourced after _deploy-env.sh):  deploy_guard_on_main
-# Env: DEPLOY_SOURCE_REMOTE (default gitea), DEPLOY_SOURCE_BRANCH (default main)
+
+readonly DEPLOY_GUARD_REMOTE=gitea
+readonly DEPLOY_GUARD_BRANCH=main
 
 deploy_guard_on_main() {
-  local remote="${DEPLOY_SOURCE_REMOTE:-gitea}" branch="${DEPLOY_SOURCE_BRANCH:-main}"
-  local head
+  local ref="$DEPLOY_GUARD_REMOTE/$DEPLOY_GUARD_BRANCH"
+  local root head tip bypass=0
+  root="$(git rev-parse --show-toplevel)" || return 1
   head="$(git rev-parse HEAD)" || return 1
 
+  if [[ -f "$root/.deploy.env" ]] && grep -Eq '^[[:space:]]*(export[[:space:]]+)?ALLOW_OFF_MAIN_DEPLOY=' "$root/.deploy.env"; then
+    echo "RECHAZADO: ALLOW_OFF_MAIN_DEPLOY esta fijado en .deploy.env; la excepcion va solo en la linea de comandos." >&2
+    return 1
+  fi
+  [[ "${ALLOW_OFF_MAIN_DEPLOY:-}" == "1" ]] && bypass=1
+
   if [[ -n "$(git status --porcelain)" ]]; then
-    if [[ "${ALLOW_OFF_MAIN_DEPLOY:-}" == "1" ]]; then
+    if [[ "$bypass" == 1 ]]; then
       echo "AVISO: ALLOW_OFF_MAIN_DEPLOY=1 — se despliega un arbol con cambios sin commitear." >&2
     else
       echo "RECHAZADO: el arbol de trabajo tiene cambios sin commitear; el deploy los empaquetaria." >&2
@@ -29,19 +43,20 @@ deploy_guard_on_main() {
     fi
   fi
 
-  if ! git fetch -q "$remote" "$branch"; then
-    echo "RECHAZADO: no se pudo leer $remote/$branch para comprobar que $head esta en main." >&2
+  if ! git fetch -q "$DEPLOY_GUARD_REMOTE" "$DEPLOY_GUARD_BRANCH"; then
+    echo "RECHAZADO: no se pudo leer $ref para comprobar que $head es su punta." >&2
     return 1
   fi
-  if git merge-base --is-ancestor "$head" "$remote/$branch"; then
+  tip="$(git rev-parse "$ref")" || return 1
+  if [[ "$head" == "$tip" ]]; then
     return 0
   fi
-  if [[ "${ALLOW_OFF_MAIN_DEPLOY:-}" == "1" ]]; then
-    echo "AVISO: ALLOW_OFF_MAIN_DEPLOY=1 — se despliega $head, que NO esta en $remote/$branch." >&2
-    echo "       Integralo en $remote/$branch cuanto antes: el proximo deploy del CI lo revertiria." >&2
+  if [[ "$bypass" == 1 ]]; then
+    echo "AVISO: ALLOW_OFF_MAIN_DEPLOY=1 — se despliega $head, que NO es la punta de $ref ($tip)." >&2
+    echo "       Integralo en $ref cuanto antes: el proximo deploy del CI lo revertiria." >&2
     return 0
   fi
-  echo "RECHAZADO: $head no esta en $remote/$branch. Integralo en main (el CI despliega desde ahi)" >&2
-  echo "           o, solo en emergencia, repite con ALLOW_OFF_MAIN_DEPLOY=1." >&2
+  echo "RECHAZADO: $head no es la punta de $ref ($tip). El CI despliega esa punta:" >&2
+  echo "           integra el cambio en main, o solo en emergencia repite con ALLOW_OFF_MAIN_DEPLOY=1." >&2
   return 1
 }

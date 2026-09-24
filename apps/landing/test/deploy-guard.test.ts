@@ -60,7 +60,7 @@ describe('deploy guard', () => {
     git(work, 'commit', '-q', '-m', 'off main');
     const r = runGuard(work);
     expect(r.code).toBe(1);
-    expect(r.err).toMatch(/RECHAZADO: .* no esta en gitea\/main/);
+    expect(r.err).toMatch(/RECHAZADO: .* no es la punta de gitea\/main/);
   });
 
   test('uncommitted changes (they would be tarred and shipped) → refused', () => {
@@ -86,5 +86,43 @@ describe('deploy guard', () => {
     const { work } = repoWithRemote();
     git(work, 'remote', 'set-url', 'gitea', join(work, 'no-such-remote.git'));
     expect(runGuard(work).code).toBe(1);
+  });
+
+  test('an older commit of main (not its tip) -> refused: the CI would ship the tip', () => {
+    const { work } = repoWithRemote();
+    const old = git(work, 'rev-parse', 'HEAD');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
+    git(work, 'add', '.');
+    git(work, 'commit', '-q', '-m', 'newer on main');
+    git(work, 'push', '-q', 'gitea', 'main');
+    git(work, 'checkout', '-q', old);
+    const r = runGuard(work);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/punta de gitea\/main/);
+  });
+
+  test('bypass persisted in .deploy.env -> refused even when set', () => {
+    const { work } = repoWithRemote();
+    git(work, 'switch', '-q', '-c', 'feature');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
+    writeFileSync(join(work, '.gitignore'), '.deploy.env\n');
+    git(work, 'add', '.');
+    git(work, 'commit', '-q', '-m', 'off main');
+    writeFileSync(join(work, '.deploy.env'), 'ALLOW_OFF_MAIN_DEPLOY=1\n');
+    const r = runGuard(work, { ALLOW_OFF_MAIN_DEPLOY: '1' });
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/\.deploy\.env/);
+  });
+
+  test('another remote cannot be swapped in (DEPLOY_SOURCE_REMOTE is ignored)', () => {
+    const { work } = repoWithRemote();
+    git(work, 'switch', '-q', '-c', 'feature');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
+    git(work, 'add', '.');
+    git(work, 'commit', '-q', '-m', 'only on the mirror');
+    git(work, 'remote', 'add', 'mirror', join(work, '..', 'remote.git'));
+    git(work, 'push', '-q', 'mirror', 'HEAD:refs/heads/other');
+    const r = runGuard(work, { DEPLOY_SOURCE_REMOTE: 'mirror', DEPLOY_SOURCE_BRANCH: 'other' });
+    expect(r.code).toBe(1);
   });
 });
