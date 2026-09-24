@@ -114,3 +114,31 @@ describe('OCSP KAT — ARCOTEL ACEs (real responders)', () => {
     expect(true).toBe(true);
   });
 });
+
+// Live answers captured 2026-09-24 from each ACE's own responder (one per
+// issuing CA, queried with a real certificate from a signed PDF). Locks the
+// strict responder authentication (RFC 6960 §4.2.2.2) against the real
+// responders: five of the six answer through a delegated responder cert.
+const LIVE_2026_09_24 = [
+  ['AC Banco Central del Ecuador', 'bce-ac'],
+  ['Security Data SubCA-2', 'securitydata-subca2-live'],
+  ['iCert-EC (Consejo de la Judicatura)', 'icert-ec'],
+  ['UANATACA CA2 2016', 'uanataca-ca2-2016'],
+  ['UANATACA CA2 2021', 'uanataca-ca2-2021'],
+  ['ArgosData CA 1', 'argosdata-ca1-live'],
+] as const;
+
+describe('OCSP KAT — live ACE responders, 2026-09-24', () => {
+  for (const [name, slug] of LIVE_2026_09_24) {
+    const ocsp = loadDer(`${slug}-ocsp-2026-09-24.der`);
+    const issuer = loadDer(`${slug}-issuer.der`);
+    it.skipIf(!ocsp || !issuer)(`${name}: authenticates and reports good`, async () => {
+      if (!ocsp || !issuer) return;
+      const parsed = await parseOcspResponse(ocsp, fakeIssuer(issuer, name), {
+        serialHex: readEchoedSerialHex(ocsp),
+      });
+      expect(parsed.signatureValid, parsed.signatureDetail).toBe(true);
+      expect(parsed.certStatus).toBe('good');
+    });
+  }
+});
