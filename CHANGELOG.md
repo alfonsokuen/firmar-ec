@@ -16,6 +16,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Verificador — motor 0.10.3 (`@firma-ec/verifier` 1.2.3; PWA 0.28.3, verify-api 0.4.3) — 2026-09-24
+
+Revisión independiente (Opus: APPROVE; Codex) de 0.10.2.
+
+#### Security
+- Si el análisis LTV supera su plazo de 12 s, tampoco se dan por comprobadas las CA de la cadena: un `good` en vivo del firmante no resuelve la revisión.
+- Una CRL **indirecta** firmada por un emisor de la cadena deja pendientes también las CA (no se limita al emisor del firmante). Una CRL pequeña que no se puede leer deja la revisión incompleta en vez de ignorarse.
+- El lector de cabeceras DER del emisor de una CRL omitida exige que cada elemento quede dentro de su contenedor.
+
+#### Fixed
+- Material de revocación omitido: el emisor de la CRL se compara por nombre (como `isEqual` de pkijs, no byte a byte) con todos los eslabones de la cadena; una CRL de un emisor ajeno a la firma ya no provoca `revocation_unchecked`.
+- `ocsp_after_expiry` tiene su propio aviso en español en lugar del genérico `ocsp_unavailable` («el servicio no respondió»), que era falso.
+- La función de la guarda de deploy no puede redefinirse desde `.deploy.env` (`readonly -f`).
+
 ### Verificador — motor 0.10.2 (`@firma-ec/verifier` 1.2.2; PWA 0.28.2, verify-api 0.4.2) — 2026-09-24
 
 Revisión independiente (Codex) de 0.10.1.

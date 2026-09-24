@@ -1,5 +1,9 @@
 # PWA changelog
 
+## 0.28.3 — 2026-09-24
+
+- Motor de verificación 0.10.3: si la revisión de revocación se corta por tiempo, tampoco se dan por comprobadas las CA de la cadena; el material de revocación omitido se atribuye por nombre del emisor (sin falsos avisos por CRL ajenas a la firma); nuevo aviso en español cuando el servicio de revocación ya no informa sobre un certificado caducado.
+
 ## 0.28.2 — 2026-09-24
 
 - Motor de verificación 0.10.2 (seguridad): el OCSP en vivo tampoco acepta un «no revocado» emitido después de caducar el certificado; material de revocación omitido que afecta a una CA de la cadena ya no se da por resuelto con la respuesta del firmante; las CRL indirectas no se interpretan por número de serie.
