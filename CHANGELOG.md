@@ -16,6 +16,21 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ## [Unreleased]
 
+### Verificador — motor 0.10.1 (`@firma-ec/verifier` 1.2.1, `@firma-ec/tsa-trust` 0.9.1; PWA 0.28.1, verify-api 0.4.1) — 2026-09-24
+
+Revisión independiente (Opus, Codex) de lo desplegado como 0.10.0.
+
+#### Security
+- **Revocaciones en CRL con alcance parcial o delta.** 0.10.0 descartaba entera una CRL con `issuingDistributionPoint` o `deltaCRLIndicator`, revocaciones incluidas: una CA subordinada revocada en la ARL de su raíz (`onlyContainsCACerts`, el formato normal de una ARL) salía `valid`. Ahora un serial listado en cualquier CRL firmada por la emisora es revocación; el alcance solo impide tomar la ausencia como favorable.
+- **Evidencia posterior a la caducidad.** Una CRL u OCSP emitidos después de caducar el certificado ya no prueban que no estuviera revocado (las CA purgan los seriales caducados), salvo CRL con `ExpiredCertsOnCRL` desde antes de la caducidad.
+- **Material de revocación omitido** (límite de tamaño o de tiempo) deja la comprobación incompleta aunque haya evidencia favorable del firmante, y entonces se consulta el OCSP en vivo; si no la resuelve, advertencia `revocation_unchecked`.
+- **Certificado de TSA**: `timeStamping` debe ser el único uso extendido y crítico (RFC 3161 §2.3). Con las raíces de ARCOTEL anclando sellos, un certificado de una CA acreditada que solo *incluyera* `timeStamping` entre otros usos podía fabricar sellos. Los TSU reales comprobados (MINTEL TSU02, UANATACA TSU01 ES y EC, FreeTSA) cumplen.
+- **Guarda de deploy**: solo despliega la punta de `gitea/main` (no un commit anterior), con remoto fijo, y rechaza la excepción `ALLOW_OFF_MAIN_DEPLOY` si está persistida en `.deploy.env`.
+
+#### Known limitations
+- Las CRL delta no se combinan con su base: una suspensión (`certificateHold`) levantada solo en una delta sigue contando como revocación (falla hacia inválido, no hacia válido).
+- Las CA de la cadena solo se comprueban con la evidencia embebida; el OCSP en vivo consulta únicamente al firmante.
+
 ### Verificador — motor 0.10.0 (`@firma-ec/verifier` 1.2.0, `@firma-ec/tsa-trust` 0.9.0, `@firma-ec/tsa-client` y `@firma-ec/ltv-validation` con cambios compatibles) — 2026-09-23
 
 #### Security

@@ -1,5 +1,9 @@
 # PWA changelog
 
+## 0.28.1 — 2026-09-24
+
+- Motor de verificación 0.10.1 (seguridad), tras una revisión independiente de lo desplegado en 0.28.0: una revocación listada en una CRL con alcance parcial o delta vuelve a contar (incluidas las ARL de CA, que se descartaban); la evidencia de «no revocado» emitida después de caducar el certificado ya no cuenta; material de revocación omitido obliga a consultar el OCSP en vivo; un certificado de sellado de tiempo debe tener `timeStamping` como único uso extendido y crítico.
+
 ## 0.28.0 — 2026-09-24
 
 - Motor de verificación 0.10.0 (seguridad). El verificador comprobaba la cadena del último certificado de la lista y no la del firmante: un certificado forjado bajo el nombre de una CA acreditada podía salir «Firma válida», y en documentos con varias firmas una firma legítima podía salir «Firma inválida». Afectaba a «Verificar firma» y a «Validar certificado». Detalle técnico en el CHANGELOG raíz.
