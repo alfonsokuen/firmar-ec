@@ -148,17 +148,21 @@ export interface ChainValidationResult {
   matchedRoot?: TsaTrustRoot;
 }
 
+/**
+ * RFC 3161 §2.3: the TSA certificate "MUST contain only one instance of the
+ * extended key usage field extension ... with KeyPurposeID having value
+ * id-kp-timeStamping. This extension MUST be critical." Enforced strictly:
+ * with the ARCOTEL roots anchoring timestamps too, a cert that merely INCLUDES
+ * timeStamping among other purposes must not be able to mint timestamps.
+ */
 function hasTimeStampingEku(cert: Certificate): boolean {
-  const exts = cert.extensions ?? [];
-  for (const ext of exts) {
-    // extnID 2.5.29.37 = extKeyUsage
-    if (ext.extnID !== '2.5.29.37') continue;
-    const parsed = ext.parsedValue as unknown as { keyPurposes?: string[] } | undefined;
-    if (parsed && Array.isArray(parsed.keyPurposes)) {
-      if (parsed.keyPurposes.includes(OID_KP_TIME_STAMPING)) return true;
-    }
-  }
-  return false;
+  const ekus = (cert.extensions ?? []).filter((e) => e.extnID === '2.5.29.37');
+  if (ekus.length !== 1) return false;
+  const ext = ekus[0]!;
+  if (ext.critical !== true) return false;
+  const parsed = ext.parsedValue as unknown as { keyPurposes?: string[] } | undefined;
+  const purposes = parsed?.keyPurposes ?? [];
+  return purposes.length === 1 && purposes[0] === OID_KP_TIME_STAMPING;
 }
 
 /**
