@@ -238,21 +238,38 @@ function crlIssuerDer(der: Uint8Array): Uint8Array | undefined {
   return f ? der.slice(f.issuerTlv[0], f.issuerTlv[1]) : undefined;
 }
 
-const CERTIFICATE_ISSUER_OID_TLV = [0x06, 0x03, 0x55, 0x1d, 0x1d];
+const CERTIFICATE_ISSUER_OID_CONTENT = [0x55, 0x1d, 0x1d];
 const IDP_OID_CONTENT = [0x55, 0x1d, 0x1c];
-
-function containsBytes(der: Uint8Array, from: number, to: number, pattern: number[]): boolean {
-  scan: for (let i = from; i + pattern.length <= to; i++) {
-    for (let k = 0; k < pattern.length; k++) if (der[i + k] !== pattern[k]) continue scan;
-    return true;
-  }
-  return false;
-}
 
 function contentIs(der: Uint8Array, node: DerNode, want: number[]): boolean {
   if (node.end - node.start !== want.length) return false;
   for (let k = 0; k < want.length; k++) if (der[node.start + k] !== want[k]) return false;
   return true;
+}
+
+/**
+ * Whether any entry carries a certificateIssuer extension, walking the entries
+ * by structure (serial, date, extensions) so that neither a serial number that
+ * happens to contain the OID's bytes nor a non-minimal length encoding of the
+ * OID changes the answer. Unreadable -> true.
+ */
+function entriesNameAnotherIssuer(der: Uint8Array, entries: DerNode): boolean {
+  const list = derChildren(der, entries);
+  if (!list) return true;
+  for (const entry of list) {
+    const parts = entry.tag === 0x30 ? derChildren(der, entry) : undefined;
+    if (!parts || parts.length < 2 || parts.length > 3) return true;
+    const exts = parts[2];
+    if (!exts) continue;
+    const extList = exts.tag === 0x30 ? derChildren(der, exts) : undefined;
+    if (!extList) return true;
+    for (const ext of extList) {
+      const oid = ext.tag === 0x30 ? derChildren(der, ext)?.[0] : undefined;
+      if (oid?.tag !== 0x06) return true;
+      if (contentIs(der, oid, CERTIFICATE_ISSUER_OID_CONTENT)) return true;
+    }
+  }
+  return false;
 }
 
 /** issuingDistributionPoint with indirectCRL set, among the crlExtensions [0]. */
@@ -280,9 +297,9 @@ function idpSaysIndirect(der: Uint8Array, extsWrap: DerNode): boolean {
 
 /**
  * Whether a CRL too large to parse may be indirect (issuingDistributionPoint
- * with indirectCRL, or an entry carrying certificateIssuer), from its headers
- * only. The entries are searched byte-wise for the certificateIssuer OID: a
- * stray match can only make the answer more cautious. Unreadable -> true.
+ * with indirectCRL, or an entry carrying certificateIssuer), reading only
+ * DER headers — no entry is decoded beyond its TLV structure. Unreadable ->
+ * true.
  */
 function crlMayBeIndirect(der: Uint8Array): boolean {
   const f = crlTbsFields(der);
@@ -296,9 +313,7 @@ function crlMayBeIndirect(der: Uint8Array): boolean {
   const entries = rest[k]?.tag === 0x30 ? rest[k++] : undefined;
   const extsWrap = rest[k]?.tag === 0xa0 ? rest[k++] : undefined;
   if (k !== rest.length) return true;
-  if (entries && containsBytes(der, entries.start, entries.end, CERTIFICATE_ISSUER_OID_TLV)) {
-    return true;
-  }
+  if (entries && entriesNameAnotherIssuer(der, entries)) return true;
   return extsWrap ? idpSaysIndirect(der, extsWrap) : false;
 }
 
@@ -862,7 +877,9 @@ export async function verifyLtv(
   // was skipped could list a revocation of the signer or of a CA, so neither
   // counts as settled; the caller then asks the live responder.
   if (budgetTripped || sizeSkipped) result.revocationIncomplete = true;
-  if (budgetTripped || caSkipped) result.caRevocationIncomplete = true;
+  // Only links between the signer's issuer and the anchor are checked (i >= 1
+  // needs a third link): with [signer, anchor] there is no CA to leave open.
+  if ((budgetTripped || caSkipped) && chain.length > 2) result.caRevocationIncomplete = true;
   if (documentTimestamp) result.documentTimestamp = documentTimestamp;
   return result;
 }

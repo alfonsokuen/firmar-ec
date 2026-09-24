@@ -157,6 +157,8 @@ function serveOcsp(bytes: Uint8Array): void {
 // One PKI for the file — forge RSA keygen is slow.
 const ca = await makeCert('OCSP Test CA', '01');
 const signer = await makeCert('SIGNER', '10', ca);
+// Above `ca`, so that `ca` is a CA link the scan checks, not the anchor.
+const upperRoot = await makeCert('LTV UPPER ROOT', '02');
 const other = await makeCert('SOMEONE ELSE', '11', ca);
 const rogue = await makeCert('ROGUE RESPONDER', '99');
 
@@ -413,6 +415,16 @@ describe('delegated OCSP responders (RFC 6960 §4.2.2.2)', () => {
 });
 
 const DAY = 24 * 60 * 60 * 1000;
+/** Same, with `ca` as an intermediate under another root: a CA link exists. */
+const ltvOfCaLink = (ocsps: Uint8Array[], crls: Uint8Array[] = [], proofTime = new Date()) =>
+  verifyLtv(
+    [signer.pkijsCert, ca.pkijsCert, upperRoot.pkijsCert],
+    { certs: [], ocsps, crls, vri: {} },
+    new Uint8Array([1]),
+    new Uint8Array(0),
+    { proofTime },
+  );
+
 const ltvOf = (ocsps: Uint8Array[], crls: Uint8Array[] = [], proofTime = new Date()) =>
   verifyLtv(
     [signer.pkijsCert, ca.pkijsCert],
@@ -746,7 +758,7 @@ describe('round 9 (Codex review of 0.10.1)', () => {
     ];
     await parsed.sign(ca.privateKey, 'SHA-256');
     const der = new Uint8Array(parsed.toSchema(true).toBER(false));
-    const ltv = await ltvOf([], [der], new Date(Date.now() - DAY));
+    const ltv = await ltvOfCaLink([], [der], new Date(Date.now() - DAY));
     expect(ltv.signerRevocation).toBeUndefined();
     // Left unread, it keeps the check open — for the CA links too.
     expect(ltv.revocationIncomplete).toBe(true);
@@ -772,7 +784,7 @@ describe('round 9 (Codex review of 0.10.1)', () => {
 
   test("skipped oversized CRL of the signer's own issuer does not taint the CA links (control)", async () => {
     const bigCaCrl = await buildCrl({ padEntries: 5000 });
-    const ltv = await ltvOf([], [bigCaCrl], new Date(Date.now() - DAY));
+    const ltv = await ltvOfCaLink([], [bigCaCrl], new Date(Date.now() - DAY));
     expect(ltv.revocationIncomplete).toBe(true);
     expect(ltv.caRevocationIncomplete).toBeUndefined();
   });
@@ -791,7 +803,7 @@ describe('round 10 (Opus + Codex review of 0.10.2)', () => {
   });
 
   test('an oversized OCSP response cannot be attributed -> CA links incomplete', async () => {
-    const ltv = await ltvOf([new Uint8Array(100_001)], []);
+    const ltv = await ltvOfCaLink([new Uint8Array(100_001)], []);
     expect(ltv.revocationIncomplete).toBe(true);
     expect(ltv.caRevocationIncomplete).toBe(true);
   });
@@ -800,7 +812,7 @@ describe('round 10 (Opus + Codex review of 0.10.2)', () => {
     const stranger = await makeCert('STRANGER CA', 'a0', undefined, { ca: true });
     const big = await buildCrl({ issuer: stranger, padEntries: 5000 });
     expect(big.byteLength).toBeGreaterThan(100_000);
-    const ltv = await ltvOf([], [big], new Date(Date.now() - DAY));
+    const ltv = await ltvOfCaLink([], [big], new Date(Date.now() - DAY));
     expect(ltv.revocationIncomplete).toBeUndefined();
     expect(ltv.caRevocationIncomplete).toBeUndefined();
     // ...and says nothing about skipping it (Opus, round 10).
@@ -829,7 +841,7 @@ describe('round 10 (Opus + Codex review of 0.10.2)', () => {
     );
     const big = await buildCrl({ padEntries: 5000, issuerName });
     expect(big.byteLength).toBeGreaterThan(100_000);
-    const ltv = await ltvOf([], [big], new Date(Date.now() - DAY));
+    const ltv = await ltvOfCaLink([], [big], new Date(Date.now() - DAY));
     expect(ltv.revocationIncomplete).toBe(true);
     expect(ltv.caRevocationIncomplete).toBeUndefined();
   });
@@ -839,7 +851,7 @@ describe('round 10 (Opus + Codex review of 0.10.2)', () => {
     const bogus = new Uint8Array(100_001);
     bogus.set([0x30, 0x00, 0x30, 0x00, 0x30, 0x00], 0);
     bogus.set(name, 6);
-    const ltv = await ltvOf([], [bogus], new Date(Date.now() - DAY));
+    const ltv = await ltvOfCaLink([], [bogus], new Date(Date.now() - DAY));
     expect(ltv.caRevocationIncomplete).toBe(true);
   });
 
@@ -857,7 +869,7 @@ describe('round 11 (Codex + Opus review of 0.10.3)', () => {
   test('oversized INDIRECT CRL named after the signer issuer -> CA links stay open', async () => {
     const big = await buildCrl({ indirect: true, padEntries: 5000 });
     expect(big.byteLength).toBeGreaterThan(100_000);
-    const ltv = await ltvOf([], [big], recently());
+    const ltv = await ltvOfCaLink([], [big], recently());
     expect(ltv.revocationIncomplete).toBe(true);
     expect(ltv.caRevocationIncomplete).toBe(true);
   });
@@ -866,14 +878,14 @@ describe('round 11 (Codex + Opus review of 0.10.3)', () => {
     const other = await makeCert('OTHER ISSUER CA', 'b1', undefined, { ca: true });
     const big = await buildCrl({ padEntries: 5000, certIssuerEntry: other.pkijsCert.subject });
     expect(big.byteLength).toBeGreaterThan(100_000);
-    const ltv = await ltvOf([], [big], recently());
+    const ltv = await ltvOfCaLink([], [big], recently());
     expect(ltv.caRevocationIncomplete).toBe(true);
   });
 
   test('oversized CRL with a plain (not indirect) IDP stays on the signer link (control)', async () => {
     const big = await buildCrl({ plainIdp: true, padEntries: 5000 });
     expect(big.byteLength).toBeGreaterThan(100_000);
-    const ltv = await ltvOf([], [big], recently());
+    const ltv = await ltvOfCaLink([], [big], recently());
     expect(ltv.revocationIncomplete).toBe(true);
     expect(ltv.caRevocationIncomplete).toBeUndefined();
   });
@@ -913,7 +925,7 @@ describe('round 11 (Codex + Opus review of 0.10.3)', () => {
     bogus.set([0x17, 0x0d, ...new TextEncoder().encode('260101000000Z')], at);
     const entriesLen = 8 + 0x200 - (at + 15 + 4);
     bogus.set([0x30, 0x82, entriesLen >> 8, entriesLen & 0xff], at + 15);
-    const ltv = await ltvOf([], [bogus], recently());
+    const ltv = await ltvOfCaLink([], [bogus], recently());
     expect(ltv.caRevocationIncomplete).toBe(true);
   });
 });
@@ -953,12 +965,105 @@ describe('round 11: real oversized CRL (Security Data SubCA-2, 1.19 MB)', () => 
     });
     expect(issuerLink.subject.typesAndValues.length).toBeGreaterThan(0);
     const ltv = await verifyLtv(
-      [signer.pkijsCert, issuerLink],
+      [signer.pkijsCert, issuerLink, upperRoot.pkijsCert],
       { certs: [], ocsps: [], crls: [der], vri: {} },
       new Uint8Array([1]),
       new Uint8Array(0),
       { proofTime: new Date(Date.now() - DAY) },
     );
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBeUndefined();
+  });
+});
+
+describe('round 12 (Codex review of 0.10.4)', () => {
+  const recently = () => new Date(Date.now() - DAY);
+  const cat = (parts: (Uint8Array | number[])[]) => {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    for (const p of parts) {
+      out.set(p, at);
+      at += p.length;
+    }
+    return out;
+  };
+  const tlv = (tag: number, ...parts: (Uint8Array | number[])[]) => {
+    const body = cat(parts);
+    const n = body.length;
+    const len =
+      n < 0x80
+        ? [n]
+        : n < 0x100
+          ? [0x81, n]
+          : n < 0x10000
+            ? [0x82, n >> 8, n & 0xff]
+            : [0x83, n >> 16, (n >> 8) & 0xff, n & 0xff];
+    return cat([[tag, ...len], body]);
+  };
+  const time = tlv(0x17, [...new TextEncoder().encode('260101000000Z')]);
+  const alg = [
+    0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b, 0x05, 0x00,
+  ];
+  /** An oversized, unsigned CRL of `ca` (a CRL skipped by size is never signature-checked). */
+  const rawCrl = (special: Uint8Array) => {
+    const pad: Uint8Array[] = [];
+    for (let n = 0; n < 5200; n++) pad.push(tlv(0x30, tlv(0x02, [0x40, n >> 8, n & 0xff]), time));
+    const tbs = tlv(
+      0x30,
+      [0x02, 0x01, 0x01],
+      alg,
+      new Uint8Array(ca.pkijsCert.subject.toSchema().toBER(false)),
+      time,
+      time,
+      tlv(0x30, ...pad, special),
+    );
+    const der = tlv(0x30, tbs, alg, [0x03, 0x02, 0x00, 0x00]);
+    expect(der.byteLength).toBeGreaterThan(100_000);
+    return der;
+  };
+  const certIssuerExt = (oidTlv: number[]) =>
+    tlv(
+      0x30,
+      oidTlv,
+      [0x01, 0x01, 0xff],
+      tlv(
+        0x04,
+        tlv(0x30, tlv(0xa4, new Uint8Array(upperRoot.pkijsCert.subject.toSchema().toBER(false)))),
+      ),
+    );
+
+  test('certificateIssuer with a long-form (BER) OID length is still seen', async () => {
+    const entry = tlv(
+      0x30,
+      tlv(0x02, [0x63]),
+      time,
+      tlv(0x30, certIssuerExt([0x06, 0x81, 0x03, 0x55, 0x1d, 0x1d])),
+    );
+    const ltv = await ltvOfCaLink([], [rawCrl(entry)], recently());
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+
+  test('certificateIssuer with the plain DER OID is seen (control)', async () => {
+    const entry = tlv(
+      0x30,
+      tlv(0x02, [0x63]),
+      time,
+      tlv(0x30, certIssuerExt([0x06, 0x03, 0x55, 0x1d, 0x1d])),
+    );
+    const ltv = await ltvOfCaLink([], [rawCrl(entry)], recently());
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+
+  test('a serial number containing the OID bytes does not make a CRL indirect', async () => {
+    const entry = tlv(0x30, tlv(0x02, [0x01, 0x06, 0x03, 0x55, 0x1d, 0x1d]), time);
+    const ltv = await ltvOfCaLink([], [rawCrl(entry)], recently());
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBeUndefined();
+  });
+
+  test('[signer, anchor]: an oversized indirect CRL leaves no CA link open (none is checked)', async () => {
+    const big = await buildCrl({ indirect: true, padEntries: 5000 });
+    const ltv = await ltvOf([], [big], recently());
     expect(ltv.revocationIncomplete).toBe(true);
     expect(ltv.caRevocationIncomplete).toBeUndefined();
   });
