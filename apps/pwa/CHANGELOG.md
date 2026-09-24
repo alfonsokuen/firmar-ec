@@ -1,5 +1,12 @@
 # PWA changelog
 
+## 0.28.0 — 2026-09-24
+
+- Motor de verificación 0.10.0 (seguridad). El verificador comprobaba la cadena del último certificado de la lista y no la del firmante: un certificado forjado bajo el nombre de una CA acreditada podía salir «Firma válida», y en documentos con varias firmas una firma legítima podía salir «Firma inválida». Afectaba a «Verificar firma» y a «Validar certificado». Detalle técnico en el CHANGELOG raíz.
+- Los sellos de tiempo se autentican de verdad (no se puede reescribir su fecha), la consulta de revocación (OCSP) se autentica, y una revocación solo invalida una firma si ocurrió antes de la hora probada.
+- Se reconocen los sellos de tiempo de las ECI acreditadas por ARCOTEL (Security Data, BCE, UANATACA Ecuador, MINTEL TSU02…) y las firmas de APPFIRMAS 2025.
+- Nuevos avisos: «Fecha de firma no demostrada» (certificado caducado y sin sello válido), revocación posterior a la firma y revocación no comprobada.
+
 ## 0.27.0 — 2026-09-14
 
 - El QR de los nuevos PDF firmados se puede pulsar para abrir el verificador. El receptor selecciona el PDF y la comprobación sigue siendo local. Incluye multifirma y páginas giradas.
