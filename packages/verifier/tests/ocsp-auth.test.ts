@@ -802,6 +802,13 @@ describe('round 10 (Opus + Codex review of 0.10.2)', () => {
     expect(summary.caRevocationIncomplete).toBe(true);
   });
 
+  test('the 12 s LTV deadline with a known [signer, anchor] chain leaves no CA link open', () => {
+    const d = { certs: [], ocsps: [new Uint8Array([1])], crls: [], vri: {} };
+    expect(ltvTimeoutSummary(d, 2).revocationIncomplete).toBe(true);
+    expect(ltvTimeoutSummary(d, 2).caRevocationIncomplete).toBeUndefined();
+    expect(ltvTimeoutSummary(d, 3).caRevocationIncomplete).toBe(true);
+  });
+
   test('an oversized OCSP response cannot be attributed -> CA links incomplete', async () => {
     const ltv = await ltvOfCaLink([new Uint8Array(100_001)], []);
     expect(ltv.revocationIncomplete).toBe(true);

@@ -444,7 +444,7 @@ async function verifyOneSignature(
         proofTime: proofOfExistence ?? new Date(),
       }),
       new Promise<import('./ltv').LtvSummary>((resolve) =>
-        setTimeout(() => resolve(ltvTimeoutSummary(dssOutcome.data)), 12_000),
+        setTimeout(() => resolve(ltvTimeoutSummary(dssOutcome.data, path.chain?.length)), 12_000),
       ),
     ]);
 

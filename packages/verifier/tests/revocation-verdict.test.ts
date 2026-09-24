@@ -408,9 +408,19 @@ describe('round 10: live answer after expiry is reported as such (Opus)', () => 
   });
 });
 
-describe('round 11: the real 12 s LTV deadline (Opus)', () => {
-  test('verifyLtv never settles + live signer good -> revocation_unchecked', async () => {
+describe('round 11-12: the real 12 s LTV deadline (Opus, Codex)', () => {
+  const runPastDeadline = async (chainLength: number) => {
     withTimestampToken();
+    vi.mocked(pathMod.validatePath).mockImplementation(
+      async (signer: unknown, _i: unknown, roots: { slug: string }[]) =>
+        ({
+          success: true,
+          chain: Array.from({ length: chainLength }, () => signer),
+          matchedRoot: roots.find((r) => r.slug === 'argosdata'),
+          warnings: [],
+          chainIncomplete: false,
+        }) as never,
+    );
     dss.data = { certs: [], ocsps: [new Uint8Array([0x30, 0x00])], crls: [], vri: {} };
     verifyLtvMock.mockImplementation(() => new Promise(() => {}));
     checkOcspMock.mockResolvedValue({
@@ -428,11 +438,20 @@ describe('round 11: the real 12 s LTV deadline (Opus)', () => {
         await vi.advanceTimersByTimeAsync(1_000);
         await new Promise((r) => setImmediate(r));
       }
-      const r = await pending;
-      expect(r.status).toBe('warning');
-      expect(r.warnings.map((w) => w.code)).toContain('revocation_unchecked');
+      return await pending;
     } finally {
       vi.useRealTimers();
     }
+  };
+
+  test('verifyLtv never settles + live signer good, with a CA link -> revocation_unchecked', async () => {
+    const r = await runPastDeadline(3);
+    expect(r.status).toBe('warning');
+    expect(r.warnings.map((w) => w.code)).toContain('revocation_unchecked');
+  });
+
+  test('same with [signer, anchor]: no CA link left open, the live answer settles it', async () => {
+    const r = await runPastDeadline(2);
+    expect(r.warnings.map((w) => w.code)).not.toContain('revocation_unchecked');
   });
 });

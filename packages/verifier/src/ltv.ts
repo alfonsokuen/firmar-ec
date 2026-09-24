@@ -371,9 +371,11 @@ function crlScopeUnsupported(crl: pkijs.CertificateRevocationList): boolean {
 
 /**
  * What the caller reports when verifyLtv does not settle within its deadline:
- * nothing was established about revocation, for any link of the chain.
+ * nothing was established about revocation, for any link of the chain. With
+ * a known [signer, anchor] chain there is no CA link to leave open (as in
+ * verifyLtv); an unknown length is treated as having one.
  */
-export function ltvTimeoutSummary(d: DssData | undefined): LtvSummary {
+export function ltvTimeoutSummary(d: DssData | undefined, chainLength?: number): LtvSummary {
   const ocspN = d?.ocsps?.length ?? 0;
   const crlN = d?.crls?.length ?? 0;
   return {
@@ -383,7 +385,7 @@ export function ltvTimeoutSummary(d: DssData | undefined): LtvSummary {
     embeddedCrlCount: crlN,
     retrospectiveValid: false,
     revocationIncomplete: true,
-    caRevocationIncomplete: true,
+    ...(chainLength === undefined || chainLength > 2 ? { caRevocationIncomplete: true } : {}),
     errors: [
       'ltv_timeout: validación de revocación a largo plazo excedió el tiempo en este dispositivo',
     ],
