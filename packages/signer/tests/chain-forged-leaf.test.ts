@@ -316,8 +316,8 @@ describe('chain validity time is not taken on the signer’s word', () => {
       fetchOcsp: false,
     });
     const s = r.signatures[0]!;
-    expect(s.status, 'a signer-declared date alone cannot make an expired cert valid').not.toBe(
-      'valid',
+    expect(s.status, 'a signer-declared date alone cannot make an expired cert valid').toBe(
+      'warning',
     );
     expect(s.warnings.some((w) => w.code === 'signing_time_unproven')).toBe(true);
   });

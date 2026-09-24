@@ -284,6 +284,7 @@ export async function checkCertificate(
   else validityStatus = 'valid';
 
   const warnings = [...path.warnings];
+  if (path.keyUsageNotSigning) warnings.push('key_usage_not_signing');
 
   // Live revocation (OCSP→CRL) when requested.
   let revocation: RevocationOutcome = { status: 'unchecked' };

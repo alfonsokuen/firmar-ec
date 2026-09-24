@@ -132,6 +132,25 @@ async function crlIssuedBy(
   }
 }
 
+/**
+ * Does revocation data issued at `thisUpdate` (valid until `nextUpdate`)
+ * speak for time `t`? Issued at or after `t`, or current at `t`.
+ */
+function coversProofTime(thisUpdate: Date, nextUpdate: Date | undefined, t: Date): boolean {
+  if (thisUpdate.getTime() >= t.getTime()) return true;
+  return nextUpdate !== undefined && t.getTime() <= nextUpdate.getTime();
+}
+
+const OID_ISSUING_DISTRIBUTION_POINT = '2.5.29.28';
+const OID_DELTA_CRL_INDICATOR = '2.5.29.27';
+
+/** CRLs whose scope this checker does not model (partitioned or delta). */
+function crlScopeUnsupported(crl: pkijs.CertificateRevocationList): boolean {
+  return (crl.crlExtensions?.extensions ?? []).some(
+    (e) => e.extnID === OID_ISSUING_DISTRIBUTION_POINT || e.extnID === OID_DELTA_CRL_INDICATOR,
+  );
+}
+
 export function toLtvParsedCert(cert: Certificate): LtvParsedCert {
   const der = new Uint8Array(cert.toSchema().toBER(false));
   return {
@@ -249,6 +268,12 @@ export async function ocspMatchesCert(
 export interface VerifyLtvOpts {
   /** When the document timestamp is present, the verifier can resolve `documentTimestamp` against TSL roots. */
   trustRoots?: unknown;
+  /**
+   * The time the signature is proven to exist (verified timestamp, else now).
+   * A `good` answer only counts as evidence if it covers this time; an old
+   * one proves nothing about the status when the document was signed.
+   */
+  proofTime?: Date;
 }
 
 /**
@@ -420,6 +445,8 @@ export async function verifyLtv(
   let signerRevocation: LtvSummary['signerRevocation'];
   let caRevocation: LtvSummary['caRevocation'];
   let signerEvidence = false;
+  let sizeSkipped = false;
+  const proofTime = _opts.proofTime ?? new Date();
 
   // We need pairs (subject, issuer) to verify OCSP signatures correctly.
   for (let i = 0; i < chain.length - 1; i++) {
@@ -441,6 +468,7 @@ export async function verifyLtv(
       const ocspDer = dss.ocsps[idx];
       if (!ocspDer) continue;
       if (ocspDer.byteLength > MAX_OCSP_BYTES) {
+        sizeSkipped = true;
         if (!errors.includes('ocsp_too_large_skipped')) {
           errors.push(`ocsp_too_large_skipped: ${ocspDer.byteLength} bytes`);
         }
@@ -469,10 +497,16 @@ export async function verifyLtv(
         linkRevoked = true;
         if (i === 0) signerRevocation = earlierRevocation(signerRevocation, parsed.revokedAt);
         else caRevocation = earlierRevocation(caRevocation, parsed.revokedAt);
-      } else if (parsed.certStatus === 'good') {
+        if (i === 0) signerEvidence = true;
+      } else if (
+        parsed.certStatus === 'good' &&
+        coversProofTime(parsed.thisUpdate, parsed.nextUpdate, proofTime)
+      ) {
+        // A `good` only speaks for the window it was issued for: a response
+        // from before a revocation cannot vouch for a later signature.
         retrospectiveValid = true;
+        if (i === 0) signerEvidence = true;
       }
-      if (i === 0 && parsed.certStatus !== 'unknown') signerEvidence = true;
     }
 
     // CRLs too: an OCSP `good` must not hide a CRL that lists the cert.
@@ -486,6 +520,7 @@ export async function verifyLtv(
       // Skip CRLs too large to parse synchronously without blocking past the
       // watchdog. The profile is unaffected (derived from DSS presence).
       if (crlDer.byteLength > MAX_CRL_BYTES) {
+        sizeSkipped = true;
         if (!errors.includes('crl_too_large_skipped')) {
           errors.push(
             `crl_too_large_skipped: ${crlDer.byteLength} bytes (revocación a largo plazo no verificada en este dispositivo)`,
@@ -498,16 +533,22 @@ export async function verifyLtv(
       // DSS material can be appended after signing by anyone: only a CRL the
       // subject's issuer actually signed says anything about the subject.
       if (!(await crlIssuedBy(crl, issuer))) continue;
-      const status = isCertRevoked(parseCert(subject), crl);
-      if (i === 0) signerEvidence = true;
+      // A partitioned (issuingDistributionPoint) or delta CRL only covers part
+      // of the certificates or changes: the absence of a serial there proves
+      // nothing, and a delta's removeFromCRL is a release, not a revocation.
+      if (crlScopeUnsupported(crl)) continue;
+      const found = isCertRevoked(parseCert(subject), crl);
+      const status = found.reason === 'removeFromCRL' ? { revoked: false as const } : found;
       if (status.revoked) {
+        if (i === 0) signerEvidence = true;
         if (!linkRevoked) errors.push(`cert_revoked_crl: ${getCN(subject) ?? 'unknown'}`);
         revokedFound = true;
         linkRevoked = true;
         if (i === 0) signerRevocation = earlierRevocation(signerRevocation, status.revokedAt);
         else caRevocation = earlierRevocation(caRevocation, status.revokedAt);
-      } else {
+      } else if (coversProofTime(crl.thisUpdate.value, crl.nextUpdate?.value, proofTime)) {
         retrospectiveValid = true;
+        if (i === 0) signerEvidence = true;
       }
     }
   }
@@ -515,7 +556,12 @@ export async function verifyLtv(
   // An interrupted scan may have stopped before the entry that proves a
   // revocation: it can report what it found, never that revocation was
   // checked and came out good.
-  if (budgetTripped) retrospectiveValid = false;
+  if (budgetTripped) {
+    retrospectiveValid = false;
+    // Whatever was found may not be the whole story: never let it stand in
+    // for the live check.
+    signerEvidence = false;
+  }
   if (budgetTripped && !errors.includes('crl_too_large_skipped')) {
     errors.push(
       'ltv_budget_exceeded: revocación a largo plazo no verificada por completo en este dispositivo',
@@ -554,7 +600,9 @@ export async function verifyLtv(
   if (signerRevocation) result.signerRevocation = signerRevocation;
   if (caRevocation) result.caRevocation = caRevocation;
   if (signerEvidence) result.signerEvidence = true;
-  if (budgetTripped) result.revocationIncomplete = true;
+  // Incomplete: the scan was cut, or material was skipped (size caps) and
+  // nothing that was read settles the signer's status.
+  if (budgetTripped || (sizeSkipped && !signerEvidence)) result.revocationIncomplete = true;
   if (documentTimestamp) result.documentTimestamp = documentTimestamp;
   return result;
 }

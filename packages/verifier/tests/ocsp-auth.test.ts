@@ -79,6 +79,7 @@ interface OcspOpts {
   /** Revoked at this date (with CRLReason `affiliationChanged`); default `good`. */
   revokedAt?: Date;
   thisUpdate?: Date;
+  nextUpdate?: Date;
   /** Build the CertID's issuer hashes from this cert instead of the real issuer. */
   certIdIssuer?: pkijs.Certificate;
 }
@@ -140,6 +141,7 @@ async function singleResponse(
     certID,
     certStatus,
     thisUpdate: opts.thisUpdate ?? new Date(Date.now() - 60_000),
+    ...(opts.nextUpdate ? { nextUpdate: opts.nextUpdate } : {}),
   });
 }
 
@@ -405,5 +407,128 @@ describe('delegated OCSP responders (RFC 6960 §4.2.2.2)', () => {
       new Uint8Array(0),
     );
     expect(ltv.signerRevocation?.revokedAt?.toISOString()).toBe(revokedAt.toISOString());
+  });
+});
+
+const DAY = 24 * 60 * 60 * 1000;
+const ltvOf = (ocsps: Uint8Array[], crls: Uint8Array[] = [], proofTime = new Date()) =>
+  verifyLtv(
+    [signer.pkijsCert, ca.pkijsCert],
+    { certs: [], ocsps, crls, vri: {} },
+    new Uint8Array([1]),
+    new Uint8Array(0),
+    { proofTime },
+  );
+
+describe('embedded evidence must cover the proven signing time (all four reviewers, 2026-09-24)', () => {
+  test('an old `good` (before the proof time, already expired) is not evidence', async () => {
+    const old = await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, {
+      thisUpdate: new Date(Date.now() - 3 * YEAR),
+      nextUpdate: new Date(Date.now() - 3 * YEAR + 7 * DAY),
+    });
+    const ltv = await ltvOf([old]);
+    expect(ltv.signerEvidence).toBeUndefined();
+    expect(ltv.retrospectiveValid).toBe(false);
+  });
+
+  test('a `good` issued after the proof time is evidence (control)', async () => {
+    const fresh = await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, {
+      thisUpdate: new Date(Date.now() - DAY),
+    });
+    const ltv = await ltvOf([fresh], [], new Date(Date.now() - 2 * DAY));
+    expect(ltv.signerEvidence).toBe(true);
+    expect(ltv.retrospectiveValid).toBe(true);
+  });
+
+  test('a CRL skipped for size, with nothing else about the signer, leaves the check incomplete', async () => {
+    const ltv = await ltvOf([], [new Uint8Array(100_001)]);
+    expect(ltv.revocationIncomplete).toBe(true);
+  });
+});
+
+async function buildCrl(opts: {
+  entries?: { serial: pkijs.Certificate; reason?: number; at: Date }[];
+  onlyCaCerts?: boolean;
+  thisUpdate?: Date;
+}): Promise<Uint8Array> {
+  const crl = new pkijs.CertificateRevocationList();
+  crl.version = 1;
+  crl.signature.algorithmId = '1.2.840.113549.1.1.11';
+  crl.issuer = ca.pkijsCert.subject;
+  crl.thisUpdate = new pkijs.Time({
+    type: 0,
+    value: opts.thisUpdate ?? new Date(Date.now() - 60_000),
+  });
+  crl.nextUpdate = new pkijs.Time({ type: 0, value: new Date(Date.now() + 7 * DAY) });
+  if (opts.entries?.length) {
+    crl.revokedCertificates = opts.entries.map(
+      (e) =>
+        new pkijs.RevokedCertificate({
+          userCertificate: e.serial.serialNumber,
+          revocationDate: new pkijs.Time({ type: 0, value: e.at }),
+          ...(e.reason !== undefined
+            ? {
+                crlEntryExtensions: new pkijs.Extensions({
+                  extensions: [
+                    new pkijs.Extension({
+                      extnID: '2.5.29.21',
+                      extnValue: new asn1js.Enumerated({ value: e.reason }).toBER(false),
+                    }),
+                  ],
+                }),
+              }
+            : {}),
+        }),
+    );
+  }
+  if (opts.onlyCaCerts) {
+    // IssuingDistributionPoint { onlyContainsCACerts [2] IMPLICIT BOOLEAN TRUE }
+    const idp = new asn1js.Sequence({
+      value: [
+        new asn1js.Primitive({
+          idBlock: { tagClass: 3, tagNumber: 2 },
+          valueHex: new Uint8Array([0xff]).buffer,
+        }),
+      ],
+    });
+    crl.crlExtensions = new pkijs.Extensions({
+      extensions: [
+        new pkijs.Extension({ extnID: '2.5.29.28', critical: true, extnValue: idp.toBER(false) }),
+      ],
+    });
+  }
+  await crl.sign(ca.privateKey, 'SHA-256');
+  return new Uint8Array(crl.toSchema(true).toBER(false));
+}
+
+describe('CRL scope and entry semantics', () => {
+  test('a complete, current CRL that does not list the signer is evidence (control)', async () => {
+    const ltv = await ltvOf([], [await buildCrl({})], new Date(Date.now() - DAY));
+    expect(ltv.signerEvidence).toBe(true);
+  });
+
+  test('a CRL scoped to CA certs (issuingDistributionPoint) is not evidence about a user cert', async () => {
+    const ltv = await ltvOf(
+      [],
+      [await buildCrl({ onlyCaCerts: true })],
+      new Date(Date.now() - DAY),
+    );
+    expect(ltv.signerEvidence).toBeUndefined();
+    expect(ltv.retrospectiveValid).toBe(false);
+  });
+
+  test('a removeFromCRL entry is a release, not a revocation', async () => {
+    const crl = await buildCrl({
+      entries: [{ serial: signer.pkijsCert, reason: 8, at: new Date(Date.now() - 10 * DAY) }],
+    });
+    const ltv = await ltvOf([], [crl], new Date(Date.now() - DAY));
+    expect(ltv.signerRevocation).toBeUndefined();
+  });
+
+  test('a plain revocation entry is a revocation (control)', async () => {
+    const at = new Date(Date.now() - 10 * DAY);
+    const crl = await buildCrl({ entries: [{ serial: signer.pkijsCert, reason: 1, at }] });
+    const ltv = await ltvOf([], [crl], new Date(Date.now() - DAY));
+    expect(ltv.signerRevocation?.revokedAt?.getTime()).toBe(Math.floor(at.getTime() / 1000) * 1000);
   });
 });

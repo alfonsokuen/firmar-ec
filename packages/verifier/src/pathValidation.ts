@@ -74,7 +74,9 @@ async function addDelegatedAnchors(
   usableRoots: TrustRoot[],
   pool: Certificate[],
   atTime: Date,
-): Promise<void> {
+): Promise<Map<number, Certificate>> {
+  // trustedCerts index of each delegated anchor → the pinned v1 root behind it.
+  const delegated = new Map<number, Certificate>();
   const rootCount = trustedCerts.length;
   for (let i = 0; i < rootCount; i++) {
     const root = trustedCerts[i]!;
@@ -84,6 +86,8 @@ async function addDelegatedAnchors(
       if (!candidate.issuer.isEqual(root.subject) || candidate.subject.isEqual(root.subject))
         continue;
       if (!isIssuingCa(candidate)) continue;
+      // pkijs also checks the anchor's dates; kept here so this never depends on it.
+      if (!isWithinValidity(candidate, atTime)) continue;
       if (trustedCerts.some((t) => sameTbs(t, candidate))) continue;
       let signedByRoot = false;
       try {
@@ -92,10 +96,12 @@ async function addDelegatedAnchors(
         signedByRoot = false;
       }
       if (!signedByRoot) continue;
+      delegated.set(trustedCerts.length, root);
       trustedCerts.push(candidate);
       usableRoots.push(usableRoots[i]!);
     }
   }
+  return delegated;
 }
 
 /**
@@ -176,7 +182,12 @@ export async function validatePath(
     }
   }
 
-  await addDelegatedAnchors(trustedCerts, usableRoots, intermediates, atTime);
+  const delegatedAnchors = await addDelegatedAnchors(
+    trustedCerts,
+    usableRoots,
+    intermediates,
+    atTime,
+  );
 
   if (trustedCerts.length === 0) {
     const allPlaceholders = roots.length > 0 && roots.every((r) => r.isPlaceholder);
@@ -228,7 +239,7 @@ export async function validatePath(
   // Fail closed unless pkijs verified the path of THIS signer. This is the
   // invariant the ordering above establishes; checking it guards against any
   // future change in pkijs's leaf selection or dedup.
-  const chain: Certificate[] = result.certificatePath ?? [];
+  let chain: Certificate[] = result.certificatePath ?? [];
   const pathLeaf = chain[0];
   if (!pathLeaf || !sameTbs(pathLeaf, signerCert)) {
     return {
@@ -254,6 +265,11 @@ export async function validatePath(
       chainIncomplete: false,
     };
   }
+  // A delegated anchor is a sub CA standing in for a v1 root: hand callers
+  // the full chain up to the pinned root, so the sub CA itself is checked for
+  // revocation like any other CA of the chain (LTV pairs subject → issuer).
+  const pinnedRoot = delegatedAnchors.get(anchorIdx);
+  if (pinnedRoot) chain = [...chain, pinnedRoot];
 
   // RFC 5280 §4.2.1.3: a document-signing cert must assert digitalSignature
   // or nonRepudiation. A cert that declares keyUsage without either was not

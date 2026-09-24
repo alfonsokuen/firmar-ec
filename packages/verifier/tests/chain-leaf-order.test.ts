@@ -211,6 +211,10 @@ describe('legacy X.509 v1 trust root (no extensions, e.g. APPFIRMAS S.A. Root AC
     expect(r.success, r.error).toBe(true);
     expect(r.matchedRoot?.slug).toBe('legacy');
     expect(sameCert(r.chain[0], v1Leaf)).toBe(true);
+    // The chain reaches the pinned v1 root, so the sub CA gets a revocation
+    // check like any CA (LTV pairs subject → issuer).
+    expect(r.chain.length).toBe(3);
+    expect(sameCert(r.chain[2], v1Root)).toBe(true);
   });
 
   test('sub CA forged under the v1 root DN (own key) is not trusted', async () => {
@@ -244,12 +248,34 @@ describe('legacy X.509 v1 trust root (no extensions, e.g. APPFIRMAS S.A. Root AC
     expect(r.success).toBe(false);
   });
 
-  test('v1 root outside its validity at the check time → rejected', async () => {
+  test('v1 root outside its validity at the check time → rejected (sub CA and leaf still valid)', async () => {
+    // Only the root is expired, so nothing but the root-validity guard can
+    // reject this: pkijs never sees the v1 root in the path.
+    const expiredRoot = makeCert({
+      cn: 'Expired V1 Root',
+      isCa: true,
+      serial: '49',
+      v1: true,
+      notBefore: new Date(Date.now() - 10 * YEAR),
+      notAfter: new Date(Date.now() - YEAR),
+    });
+    const sub = makeCert({
+      cn: 'Sub Under Expired',
+      isCa: true,
+      serial: '4a',
+      issuer: expiredRoot,
+    });
+    const leaf = makeCert({
+      cn: 'LEAF UNDER EXPIRED ROOT',
+      isCa: false,
+      serial: '4b',
+      issuer: sub,
+    });
     const r = await validatePath(
-      toPkijs(v1Leaf),
-      [toPkijs(v1Sub)],
-      [await asRoot('legacy', v1Root)],
-      new Date(Date.now() + 20 * YEAR),
+      toPkijs(leaf),
+      [toPkijs(sub)],
+      [await asRoot('legacy-expired', expiredRoot)],
+      new Date(),
     );
     expect(r.success).toBe(false);
   });
@@ -285,5 +311,21 @@ describe('legacy X.509 v1 trust root (no extensions, e.g. APPFIRMAS S.A. Root AC
       new Date(),
     );
     expect(r.success).toBe(false);
+  });
+
+  test('checkCertificate explains a non-signing keyUsage', async () => {
+    const encOnly = makeCert({
+      cn: 'ENCRYPTION ONLY 2',
+      isCa: false,
+      serial: '4c',
+      issuer: v1Sub,
+      keyUsage: { keyEncipherment: true },
+    });
+    const r = await checkCertificate(encOnly.der, [v1Sub.der], {
+      trustRoots: [await asRoot('legacy', v1Root)],
+      trustIntermediates: [],
+    });
+    expect(r.trusted).toBe(false);
+    expect(r.warnings).toContain('key_usage_not_signing');
   });
 });

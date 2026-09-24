@@ -440,7 +440,9 @@ async function verifyOneSignature(
     // returns regardless of what stalls inside, degrading to a DSS-presence
     // summary with an `ltv_timeout` note.
     const ltvSummary = await Promise.race([
-      verifyLtv(path.chain ?? [], dssOutcome.data, sig.contents, pdfBytes),
+      verifyLtv(path.chain ?? [], dssOutcome.data, sig.contents, pdfBytes, {
+        proofTime: proofOfExistence ?? new Date(),
+      }),
       new Promise<import('./ltv').LtvSummary>((resolve) =>
         setTimeout(() => {
           const d = dssOutcome.data;
@@ -639,7 +641,9 @@ async function verifyOneSignature(
         warnings.push({
           code: 'cert_revoked',
           message:
-            'El certificado del firmante fue revocado por la ACE emisora antes o en el momento de la firma.',
+            embeddedRevocation === ltvSummary.signerRevocation
+              ? 'El certificado del firmante fue revocado por la ACE emisora antes o en el momento de la firma.'
+              : 'Una autoridad certificadora de la cadena del firmante fue revocada antes o en el momento de la firma.',
         });
       } else {
         revokedAfterSigning = true;
@@ -659,12 +663,7 @@ async function verifyOneSignature(
     // answer settled it. Not a failure of the signature — but never `valid`
     // on an unfinished check (Codex, Opus, Fable).
     const liveSettled = ocsp?.status === 'good' || ocsp?.status === 'revoked';
-    if (
-      ltvSummary.dssPresent &&
-      ltvSummary.revocationIncomplete &&
-      !ltvSummary.signerEvidence &&
-      !liveSettled
-    ) {
+    if (ltvSummary.dssPresent && ltvSummary.revocationIncomplete && !liveSettled) {
       if (status === 'valid') status = 'warning';
       warnings.push({
         code: 'revocation_unchecked',

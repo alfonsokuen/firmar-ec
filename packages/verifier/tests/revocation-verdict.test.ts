@@ -309,4 +309,43 @@ describe('embedded DSS only replaces live OCSP when it authenticated something a
     expect(r.status).toBe('invalid');
     expect(r.warnings.map((w) => w.code)).toContain('cert_revoked');
   });
+
+  test('check cut short and live OCSP not reachable (not_checked) → warning revocation_unchecked', async () => {
+    withTimestampToken();
+    dss.data = garbageDss;
+    verifyLtvMock.mockResolvedValue({
+      ...noLtv,
+      dssPresent: true,
+      profile: 'B-LT',
+      revocationIncomplete: true,
+    });
+    checkOcspMock.mockResolvedValue({
+      status: 'not_checked',
+      source: 'none',
+      checkedAt: new Date().toISOString(),
+    });
+    const r = await verifyPdf(await loadPdf());
+    expect(r.status).toBe('warning');
+    expect(r.warnings.map((w) => w.code)).toContain('revocation_unchecked');
+  });
+
+  test('embedded evidence found but the scan was incomplete → never valid', async () => {
+    withTimestampToken();
+    dss.data = garbageDss;
+    verifyLtvMock.mockResolvedValue({
+      ...noLtv,
+      dssPresent: true,
+      profile: 'B-LT',
+      signerEvidence: true,
+      revocationIncomplete: true,
+    });
+    checkOcspMock.mockResolvedValue({
+      status: 'not_checked',
+      source: 'none',
+      checkedAt: new Date().toISOString(),
+    });
+    const r = await verifyPdf(await loadPdf());
+    expect(r.status).toBe('warning');
+    expect(r.warnings.map((w) => w.code)).toContain('revocation_unchecked');
+  });
 });

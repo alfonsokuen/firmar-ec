@@ -55,8 +55,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
   unos bytes cualesquiera en `/DSS` para no consultarlo. La LTV se evalúa ahora antes que el OCSP. Si la
   revisión embebida se corta por tiempo, no hay evidencia autenticada y el OCSP en vivo no la zanja, la
   firma queda en advertencia (`revocation_unchecked`), nunca `valid`.
+- **La evidencia embebida tiene que cubrir la hora probada de la firma.** Un OCSP `good` o una CRL que
+  no lista el certificado solo cuentan si se emitieron después de esa hora o seguían vigentes en ella;
+  una respuesta antigua, anterior a una revocación, ya no puede sustituir a la consulta en vivo. Una
+  revocación autenticada cuenta siempre.
+- Las CRL con `issuingDistributionPoint` (particionadas) o delta no se usan como evidencia, y una
+  entrada `removeFromCRL` no se interpreta como revocación.
+- Omitir material de la DSS por tamaño sin tener otra evidencia del firmante, o cortar la revisión por
+  tiempo, deja la revocación como no comprobada (`revocation_unchecked` salvo que el OCSP en vivo la
+  resuelva).
+- Con una raíz v1, la cadena devuelta llega hasta la raíz fijada, de modo que la CA subordinada que
+  actúa de ancla también se comprueba por revocación.
 - La revocación autenticada de una **CA intermedia** anterior a la hora probada invalida la firma igual
-  que la del firmante.
+  que la del firmante, con su propio mensaje.
 - El certificado de la TSA se elige por el `sid` del firmante del sello, no por su posición en
   `certificates`.
 - Un certificado cuyo `keyUsage` no incluye `digitalSignature` ni `nonRepudiation` se rechaza
