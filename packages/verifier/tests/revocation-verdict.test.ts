@@ -349,3 +349,44 @@ describe('embedded DSS only replaces live OCSP when it authenticated something a
     expect(r.warnings.map((w) => w.code)).toContain('revocation_unchecked');
   });
 });
+
+describe('round 9: a signer answer does not settle unchecked CA links (Codex)', () => {
+  const garbage = { certs: [], ocsps: [new Uint8Array([0x30, 0x00])], crls: [], vri: {} };
+  test('CA-link material skipped + live signer OCSP good -> warning revocation_unchecked', async () => {
+    withTimestampToken();
+    dss.data = garbage;
+    verifyLtvMock.mockResolvedValue({
+      ...noLtv,
+      dssPresent: true,
+      profile: 'B-LT',
+      revocationIncomplete: true,
+      caRevocationIncomplete: true,
+    });
+    checkOcspMock.mockResolvedValue({
+      status: 'good',
+      source: 'live',
+      checkedAt: new Date().toISOString(),
+    });
+    const r = await verifyPdf(await loadPdf());
+    expect(r.status).toBe('warning');
+    expect(r.warnings.map((w) => w.code)).toContain('revocation_unchecked');
+  });
+
+  test('only signer-link material skipped + live signer OCSP good -> settled (control)', async () => {
+    withTimestampToken();
+    dss.data = garbage;
+    verifyLtvMock.mockResolvedValue({
+      ...noLtv,
+      dssPresent: true,
+      profile: 'B-LT',
+      revocationIncomplete: true,
+    });
+    checkOcspMock.mockResolvedValue({
+      status: 'good',
+      source: 'live',
+      checkedAt: new Date().toISOString(),
+    });
+    const r = await verifyPdf(await loadPdf());
+    expect(r.warnings.map((w) => w.code)).not.toContain('revocation_unchecked');
+  });
+});

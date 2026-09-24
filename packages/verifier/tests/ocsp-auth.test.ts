@@ -451,6 +451,10 @@ async function buildCrl(opts: {
   onlyCaCerts?: boolean;
   /** issuingDistributionPoint with only a distributionPoint name (still a full CRL). */
   plainIdp?: boolean;
+  /** issuingDistributionPoint { indirectCRL [4] TRUE }; entries may name another issuer. */
+  indirect?: boolean;
+  /** Pad the CRL with this many unrelated entries (to exceed the size cap). */
+  padEntries?: number;
   delta?: boolean;
   /** ExpiredCertsOnCRL (2.5.29.60): expired certs stay listed since this date. */
   expiredCertsOnCrl?: Date;
@@ -467,6 +471,18 @@ async function buildCrl(opts: {
     value: opts.thisUpdate ?? new Date(Date.now() - 60_000),
   });
   crl.nextUpdate = new pkijs.Time({ type: 0, value: new Date(Date.now() + 7 * DAY) });
+  if (opts.padEntries) {
+    const pad: pkijs.RevokedCertificate[] = [];
+    for (let n = 0; n < opts.padEntries; n++) {
+      pad.push(
+        new pkijs.RevokedCertificate({
+          userCertificate: new asn1js.Integer({ value: 100000 + n }),
+          revocationDate: new pkijs.Time({ type: 0, value: new Date(Date.now() - 400 * DAY) }),
+        }),
+      );
+    }
+    crl.revokedCertificates = [...(crl.revokedCertificates ?? []), ...pad];
+  }
   if (opts.entries?.length) {
     crl.revokedCertificates = opts.entries.map(
       (e) =>
@@ -489,7 +505,7 @@ async function buildCrl(opts: {
     );
   }
   const exts: pkijs.Extension[] = [];
-  if (opts.onlyCaCerts || opts.plainIdp) {
+  if (opts.onlyCaCerts || opts.plainIdp || opts.indirect) {
     // IssuingDistributionPoint: [2] onlyContainsCACerts, or [0] a distributionPoint name.
     const dpName = new asn1js.Constructed({
       idBlock: { tagClass: 3, tagNumber: 0 },
@@ -509,7 +525,13 @@ async function buildCrl(opts: {
       idBlock: { tagClass: 3, tagNumber: 2 },
       valueHex: new Uint8Array([0xff]).buffer,
     });
-    const idp = new asn1js.Sequence({ value: [opts.onlyCaCerts ? onlyCa : dpName] });
+    const indirectFlag = new asn1js.Primitive({
+      idBlock: { tagClass: 3, tagNumber: 4 },
+      valueHex: new Uint8Array([0xff]).buffer,
+    });
+    const idp = new asn1js.Sequence({
+      value: [opts.onlyCaCerts ? onlyCa : dpName, ...(opts.indirect ? [indirectFlag] : [])],
+    });
     exts.push(
       new pkijs.Extension({ extnID: '2.5.29.28', critical: true, extnValue: idp.toBER(false) }),
     );
@@ -652,5 +674,76 @@ describe('skipped material leaves the check incomplete even with signer evidence
     });
     const ltv = await ltvOf([fresh], [new Uint8Array(100_001)], new Date(Date.now() - 2 * DAY));
     expect(ltv.revocationIncomplete).toBe(true);
+  });
+});
+
+describe('round 9 (Codex review of 0.10.1)', () => {
+  test('live OCSP: a `good` produced after the cert expired is not taken as good', async () => {
+    const expired = await makeCert('EXPIRED LIVE', '90', ca, {
+      notBefore: new Date(Date.now() - 2 * YEAR),
+      notAfter: new Date(Date.now() - 30 * DAY),
+    });
+    serveOcsp(await ocspResponse(expired.pkijsCert, ca.pkijsCert, ca));
+    const r = await checkOcsp({
+      signerCert: expired.pkijsCert,
+      issuerCert: ca.pkijsCert,
+      acSlug: 'x',
+    });
+    expect(r.status).toBe('unknown');
+    expect(r.reason).toBe('ocsp_after_expiry');
+  });
+
+  test('indirect CRL entry naming ANOTHER issuer with the same serial does not revoke the signer', async () => {
+    const other = await makeCert('OTHER ISSUER CA', '91', undefined, { ca: true });
+    const crl = await buildCrl({ indirect: true, entries: [] });
+    // Re-sign with an entry that carries certificateIssuer = other CA.
+    const asn = asn1js.fromBER(crl.slice().buffer);
+    const parsed = new pkijs.CertificateRevocationList({ schema: asn.result });
+    const gn = new pkijs.GeneralNames({
+      names: [new pkijs.GeneralName({ type: 4, value: other.pkijsCert.subject })],
+    });
+    parsed.revokedCertificates = [
+      new pkijs.RevokedCertificate({
+        userCertificate: signer.pkijsCert.serialNumber,
+        revocationDate: new pkijs.Time({ type: 0, value: new Date(Date.now() - 10 * DAY) }),
+        crlEntryExtensions: new pkijs.Extensions({
+          extensions: [
+            new pkijs.Extension({
+              extnID: '2.5.29.29',
+              critical: true,
+              extnValue: gn.toSchema().toBER(false),
+            }),
+          ],
+        }),
+      }),
+    ];
+    await parsed.sign(ca.privateKey, 'SHA-256');
+    const der = new Uint8Array(parsed.toSchema(true).toBER(false));
+    const ltv = await ltvOf([], [der], new Date(Date.now() - DAY));
+    expect(ltv.signerRevocation).toBeUndefined();
+  });
+
+  test('skipped oversized CRL of a CA link is reported apart from the signer link', async () => {
+    const root = await makeCert('SKIP ROOT', '92');
+    const sub = await makeCert('SKIP SUB', '93', root, { ca: true });
+    const leaf = await makeCert('SKIP LEAF', '94', sub);
+    const bigRootCrl = await buildCrl({ issuer: root, padEntries: 5000 });
+    expect(bigRootCrl.byteLength).toBeGreaterThan(100_000);
+    const ltv = await verifyLtv(
+      [leaf.pkijsCert, sub.pkijsCert, root.pkijsCert],
+      { certs: [], ocsps: [], crls: [bigRootCrl], vri: {} },
+      new Uint8Array([1]),
+      new Uint8Array(0),
+      { proofTime: new Date(Date.now() - DAY) },
+    );
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBe(true);
+  });
+
+  test("skipped oversized CRL of the signer's own issuer does not taint the CA links (control)", async () => {
+    const bigCaCrl = await buildCrl({ padEntries: 5000 });
+    const ltv = await ltvOf([], [bigCaCrl], new Date(Date.now() - DAY));
+    expect(ltv.revocationIncomplete).toBe(true);
+    expect(ltv.caRevocationIncomplete).toBeUndefined();
   });
 });

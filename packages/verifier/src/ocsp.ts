@@ -130,6 +130,14 @@ export async function checkOcsp(
     if (stale || notYetValid) {
       return { status: 'unknown', checkedAt, source: 'live', reason: 'ocsp_response_not_current' };
     }
+    // A `good` produced after the cert expired says nothing about it: CAs stop
+    // tracking expired certs, and some responders answer `good` for them.
+    if (
+      parsed.certStatus === 'good' &&
+      parsed.thisUpdate.getTime() > (ctx.signerCert.notAfter.value as Date).getTime()
+    ) {
+      return { status: 'unknown', checkedAt, source: 'live', reason: 'ocsp_after_expiry' };
+    }
     const ocspResult: OcspStatus = { status: parsed.certStatus, checkedAt, source: 'live' };
     if (parsed.revokedAt !== undefined) ocspResult.revokedAt = parsed.revokedAt.toISOString();
     if (parsed.revocationReason !== undefined) ocspResult.reason = parsed.revocationReason;

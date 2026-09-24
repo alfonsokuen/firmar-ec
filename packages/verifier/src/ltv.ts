@@ -67,6 +67,11 @@ export interface LtvSummary {
   signerEvidence?: boolean;
   /** The scan stopped early (time budget or deadline): absence of a revocation proves nothing. */
   revocationIncomplete?: boolean;
+  /**
+   * Part of what was skipped concerns a CA of the chain (or could not be
+   * attributed): a live answer about the signer does not settle it.
+   */
+  caRevocationIncomplete?: boolean;
   /** Document timestamp (B-LTA). Absent when no /Sig /ETSI.RFC3161 found. */
   documentTimestamp?: DocumentTimestampSummary;
   /** Free-form diagnostic strings — never block outer signature. */
@@ -168,6 +173,71 @@ function crlStillListsExpired(crl: pkijs.CertificateRevocationList, subject: Cer
   const asn = asn1js.fromBER(ext.extnValue.valueBlock.valueHexView.slice().buffer);
   if (!(asn.result instanceof asn1js.GeneralizedTime)) return false;
   return asn.result.toDate().getTime() <= (subject.notAfter.value as Date).getTime();
+}
+
+const OID_CERTIFICATE_ISSUER = '2.5.29.29';
+
+function nameDer(name: pkijs.RelativeDistinguishedNames): Uint8Array {
+  return new Uint8Array(name.toSchema().toBER(false));
+}
+
+function bytesEq(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.byteLength !== b.byteLength) return false;
+  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/**
+ * The issuer Name of a DER CertificateList, read by walking only the headers
+ * of the outer structures — never the (possibly huge) list of entries, which
+ * is exactly what makes an oversized CRL too slow to parse. undefined when
+ * the shape is not the expected one.
+ */
+function crlIssuerDer(der: Uint8Array): Uint8Array | undefined {
+  const header = (at: number): { tag: number; start: number; end: number } | undefined => {
+    if (at + 2 > der.length) return undefined;
+    const tag = der[at]!;
+    let len = der[at + 1]!;
+    let start = at + 2;
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      if (n === 0 || n > 4 || start + n > der.length) return undefined;
+      len = 0;
+      for (let k = 0; k < n; k++) len = len * 256 + der[start + k]!;
+      start += n;
+    }
+    return { tag, start, end: start + len };
+  };
+  const outer = header(0);
+  if (!outer || outer.tag !== 0x30) return undefined;
+  const tbs = header(outer.start);
+  if (!tbs || tbs.tag !== 0x30) return undefined;
+  let cur = header(tbs.start);
+  if (cur && cur.tag === 0x02) cur = header(cur.end); // optional version
+  if (!cur || cur.tag !== 0x30) return undefined; // signature AlgorithmIdentifier
+  const issuer = header(cur.end);
+  if (!issuer || issuer.tag !== 0x30 || issuer.end > der.length) return undefined;
+  return der.slice(cur.end, issuer.end);
+}
+
+/** issuingDistributionPoint.indirectCRL, or any entry carrying certificateIssuer. */
+function crlIsIndirect(crl: pkijs.CertificateRevocationList): boolean {
+  const idp = (crl.crlExtensions?.extensions ?? []).find(
+    (e) => e.extnID === OID_ISSUING_DISTRIBUTION_POINT,
+  );
+  if (idp) {
+    const asn = asn1js.fromBER(idp.extnValue.valueBlock.valueHexView.slice().buffer);
+    const fields =
+      (asn.result as { valueBlock?: { value?: asn1js.AsnType[] } }).valueBlock?.value ?? [];
+    for (const f of fields) {
+      const id = (f as { idBlock?: { tagClass?: number; tagNumber?: number } }).idBlock;
+      const v = (f as { valueBlock?: { valueHexView?: Uint8Array } }).valueBlock?.valueHexView;
+      if (id?.tagClass === 3 && id.tagNumber === 4 && v && v[0] !== 0) return true;
+    }
+  }
+  return (crl.revokedCertificates ?? []).some((rc) =>
+    (rc.crlEntryExtensions?.extensions ?? []).some((e) => e.extnID === OID_CERTIFICATE_ISSUER),
+  );
 }
 
 const OID_ISSUING_DISTRIBUTION_POINT = '2.5.29.28';
@@ -475,6 +545,14 @@ export async function verifyLtv(
   let caRevocation: LtvSummary['caRevocation'];
   let signerEvidence = false;
   let sizeSkipped = false;
+  // Skipped material that concerns (or may concern) a CA link, not the signer's issuer.
+  let caSkipped = false;
+  const signerIssuerDer = chain[1] ? nameDer(chain[1].subject) : undefined;
+  const markCrlSkipped = (der: Uint8Array) => {
+    sizeSkipped = true;
+    const issuer = crlIssuerDer(der);
+    if (!issuer || !signerIssuerDer || !bytesEq(issuer, signerIssuerDer)) caSkipped = true;
+  };
   const proofTime = _opts.proofTime ?? new Date();
 
   // We need pairs (subject, issuer) to verify OCSP signatures correctly.
@@ -498,6 +576,7 @@ export async function verifyLtv(
       if (!ocspDer) continue;
       if (ocspDer.byteLength > MAX_OCSP_BYTES) {
         sizeSkipped = true;
+        caSkipped = true; // an oversized response is not attributed to a link
         if (!errors.includes('ocsp_too_large_skipped')) {
           errors.push(`ocsp_too_large_skipped: ${ocspDer.byteLength} bytes`);
         }
@@ -550,7 +629,7 @@ export async function verifyLtv(
       // Skip CRLs too large to parse synchronously without blocking past the
       // watchdog. The profile is unaffected (derived from DSS presence).
       if (crlDer.byteLength > MAX_CRL_BYTES) {
-        sizeSkipped = true;
+        markCrlSkipped(crlDer);
         if (!errors.includes('crl_too_large_skipped')) {
           errors.push(
             `crl_too_large_skipped: ${crlDer.byteLength} bytes (revocación a largo plazo no verificada en este dispositivo)`,
@@ -567,6 +646,13 @@ export async function verifyLtv(
       // is scoped to CA certs by design). The scope only limits the favorable
       // reading: in a partitioned (issuingDistributionPoint) or delta CRL the
       // ABSENCE of a serial proves nothing. removeFromCRL is a release.
+      // An indirect CRL can list certs of OTHER issuers under the same serial
+      // (certificateIssuer); matching by serial alone could revoke the wrong
+      // cert. Not modelled: left unread, the check stays incomplete.
+      if (crlIsIndirect(crl)) {
+        markCrlSkipped(crlDer);
+        continue;
+      }
       const found = isCertRevoked(parseCert(subject), crl);
       const status = found.reason === 'removeFromCRL' ? { revoked: false as const } : found;
       if (status.revoked) {
@@ -640,6 +726,7 @@ export async function verifyLtv(
   // was skipped could list a revocation of the signer or of a CA, so neither
   // counts as settled; the caller then asks the live responder.
   if (budgetTripped || sizeSkipped) result.revocationIncomplete = true;
+  if (budgetTripped || caSkipped) result.caRevocationIncomplete = true;
   if (documentTimestamp) result.documentTimestamp = documentTimestamp;
   return result;
 }

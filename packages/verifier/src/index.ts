@@ -43,7 +43,7 @@ export type { CertCheckResult, CertCheckOptions } from './certCheck';
 
 // Bump on each release (kept hardcoded — JSON imports require resolveJsonModule
 // + downstream tsconfig coupling we'd rather avoid in this package).
-export const ENGINE_VERSION = '0.10.1';
+export const ENGINE_VERSION = '0.10.2';
 
 /**
  * Dedupe a certificate list by DER fingerprint. Used to merge intermediates
@@ -666,7 +666,10 @@ async function verifyOneSignature(
     // answer settled it. Not a failure of the signature — but never `valid`
     // on an unfinished check (Codex, Opus, Fable).
     const liveSettled = ocsp?.status === 'good' || ocsp?.status === 'revoked';
-    if (ltvSummary.dssPresent && ltvSummary.revocationIncomplete && !liveSettled) {
+    // The live answer is about the signer only: it cannot settle skipped
+    // material that concerns a CA of the chain.
+    const settled = liveSettled && ltvSummary.caRevocationIncomplete !== true;
+    if (ltvSummary.dssPresent && ltvSummary.revocationIncomplete && !settled) {
       if (status === 'valid') status = 'warning';
       warnings.push({
         code: 'revocation_unchecked',
