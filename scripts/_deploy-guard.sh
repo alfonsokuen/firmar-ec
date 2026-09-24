@@ -64,3 +64,5 @@ deploy_guard_on_main() {
   echo "           integra el cambio en main, o solo en emergencia repite con ALLOW_OFF_MAIN_DEPLOY=1." >&2
   return 1
 }
+# The env file is sourced after this one: it must not be able to replace the check.
+readonly -f deploy_guard_on_main

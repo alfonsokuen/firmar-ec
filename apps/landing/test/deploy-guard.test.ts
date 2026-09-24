@@ -147,7 +147,7 @@ describe('deploy guard: the bypass cannot come from a sourced env file (Codex)',
       encoding: 'utf8',
       env: { ...process.env, ALLOW_OFF_MAIN_DEPLOY: '' },
     });
-    return r.status;
+    return { code: r.status, err: r.stderr };
   };
 
   for (const line of [
@@ -156,7 +156,29 @@ describe('deploy guard: the bypass cannot come from a sourced env file (Codex)',
     'ALLOW_OFF_MAIN_DEPLOY=1',
   ]) {
     test(`env file with \`${line}\` -> refused`, () => {
-      expect(runWithEnvFile(offMain(), `${line}\n`)).not.toBe(0);
+      const r = runWithEnvFile(offMain(), `${line}\n`);
+      expect(r.code).toBe(1);
+      expect(r.err).toMatch(/no es la punta de gitea\/main/);
     });
   }
+});
+
+describe('deploy guard: the check itself cannot be redefined by the env file (Opus)', () => {
+  test('an env file redefining deploy_guard_on_main -> fails', () => {
+    const { work } = repoWithRemote();
+    git(work, 'switch', '-q', '-c', 'feature');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
+    git(work, 'add', '.');
+    git(work, 'commit', '-q', '-m', 'off main');
+    const envPath = join(work, '..', 'redefine.env');
+    writeFileSync(envPath, 'deploy_guard_on_main() { return 0; }\n');
+    const g = GUARD.replace(/\\/g, '/');
+    const e = envPath.replace(/\\/g, '/');
+    const r = spawnSync('bash', ['-c', `set -e; . "${g}"; . "${e}"; deploy_guard_on_main`], {
+      cwd: work,
+      encoding: 'utf8',
+      env: { ...process.env, ALLOW_OFF_MAIN_DEPLOY: '' },
+    });
+    expect(r.status).not.toBe(0);
+  });
 });
