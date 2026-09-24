@@ -18,7 +18,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y este
 
 ### Verificador — motor 0.10.4 (`@firma-ec/verifier` 1.2.4; PWA 0.28.4, verify-api 0.4.4) — 2026-09-24
 
-Revisión independiente de 0.10.3 (Opus: APPROVE; Codex: BLOCK con 2 HIGH) y de su primer arreglo (Codex: 1 HIGH + 2 MEDIUM), todo arreglado aquí.
+Revisión independiente de 0.10.3 (Opus: APPROVE; Codex: BLOCK con 2 HIGH) y de sus arreglos (Codex: 1 HIGH + 3 MEDIUM), todo arreglado aquí.
 
 #### Security
 - Una CRL omitida por tamaño se atribuía solo al emisor del firmante sin saber si era **indirecta**. Ahora se recorre su estructura TLV sin decodificar las entradas: se lee `issuingDistributionPoint.indirectCRL` y se busca la extensión `certificateIssuer` entrada por entrada, comparando el OID por contenido (también con longitudes BER no mínimas). Si puede ser indirecta, o no se puede leer, quedan pendientes también las CA. Antes, un `good` en vivo del firmante dejaba la firma `valid`.
@@ -27,7 +27,7 @@ Revisión independiente de 0.10.3 (Opus: APPROVE; Codex: BLOCK con 2 HIGH) y de 
 #### Fixed
 - Una CRL grande de un emisor ajeno a la firma ya no añade el aviso `crl_too_large_skipped`, y el aviso ya no se repite por cada eslabón.
 - Un número de serie que contiene los bytes del OID de `certificateIssuer` ya no hace pasar una CRL directa por indirecta (falso `revocation_unchecked`).
-- Con una cadena `[firmante, ancla]` no hay CA intermedia que revisar: ya no se marca ninguna como pendiente.
+- Con una cadena `[firmante, ancla]` no hay CA intermedia que revisar: ya no se marca ninguna como pendiente, tampoco cuando el análisis LTV agota su plazo de 12 s.
 - Los `scripts/deploy-*.sh` ejecutan la guarda **antes** de cargar `.deploy.env`: nada de lo que ese fichero defina (ni un envoltorio de `git`) llega a la comprobación.
 
 #### Tests
