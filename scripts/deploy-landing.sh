@@ -28,6 +28,8 @@ fi
 [[ -z "$VERSION" ]] && { echo "ERROR: cannot determine version"; exit 1; }
 
 . "$REPO_ROOT/scripts/_deploy-env.sh"
+. "$REPO_ROOT/scripts/_deploy-guard.sh"
+deploy_guard_on_main || exit 1
 IMAGE="$REGISTRY/firma-ec-landing:$VERSION"
 TGZ="/tmp/firma-ec-landing-deploy-$VERSION.tgz"
 
