@@ -449,12 +449,19 @@ describe('embedded evidence must cover the proven signing time (all four reviewe
 async function buildCrl(opts: {
   entries?: { serial: pkijs.Certificate; reason?: number; at: Date }[];
   onlyCaCerts?: boolean;
+  /** issuingDistributionPoint with only a distributionPoint name (still a full CRL). */
+  plainIdp?: boolean;
+  delta?: boolean;
+  /** ExpiredCertsOnCRL (2.5.29.60): expired certs stay listed since this date. */
+  expiredCertsOnCrl?: Date;
   thisUpdate?: Date;
+  issuer?: Gen & { pkijsCert: pkijs.Certificate };
 }): Promise<Uint8Array> {
+  const signerCa = opts.issuer ?? ca;
   const crl = new pkijs.CertificateRevocationList();
   crl.version = 1;
   crl.signature.algorithmId = '1.2.840.113549.1.1.11';
-  crl.issuer = ca.pkijsCert.subject;
+  crl.issuer = signerCa.pkijsCert.subject;
   crl.thisUpdate = new pkijs.Time({
     type: 0,
     value: opts.thisUpdate ?? new Date(Date.now() - 60_000),
@@ -481,23 +488,51 @@ async function buildCrl(opts: {
         }),
     );
   }
-  if (opts.onlyCaCerts) {
-    // IssuingDistributionPoint { onlyContainsCACerts [2] IMPLICIT BOOLEAN TRUE }
-    const idp = new asn1js.Sequence({
+  const exts: pkijs.Extension[] = [];
+  if (opts.onlyCaCerts || opts.plainIdp) {
+    // IssuingDistributionPoint: [2] onlyContainsCACerts, or [0] a distributionPoint name.
+    const dpName = new asn1js.Constructed({
+      idBlock: { tagClass: 3, tagNumber: 0 },
       value: [
-        new asn1js.Primitive({
-          idBlock: { tagClass: 3, tagNumber: 2 },
-          valueHex: new Uint8Array([0xff]).buffer,
+        new asn1js.Constructed({
+          idBlock: { tagClass: 3, tagNumber: 0 },
+          value: [
+            new asn1js.Primitive({
+              idBlock: { tagClass: 3, tagNumber: 6 },
+              valueHex: new TextEncoder().encode('http://crl.test/full.crl').buffer,
+            }),
+          ],
         }),
       ],
     });
-    crl.crlExtensions = new pkijs.Extensions({
-      extensions: [
-        new pkijs.Extension({ extnID: '2.5.29.28', critical: true, extnValue: idp.toBER(false) }),
-      ],
+    const onlyCa = new asn1js.Primitive({
+      idBlock: { tagClass: 3, tagNumber: 2 },
+      valueHex: new Uint8Array([0xff]).buffer,
     });
+    const idp = new asn1js.Sequence({ value: [opts.onlyCaCerts ? onlyCa : dpName] });
+    exts.push(
+      new pkijs.Extension({ extnID: '2.5.29.28', critical: true, extnValue: idp.toBER(false) }),
+    );
   }
-  await crl.sign(ca.privateKey, 'SHA-256');
+  if (opts.delta) {
+    exts.push(
+      new pkijs.Extension({
+        extnID: '2.5.29.27',
+        critical: true,
+        extnValue: new asn1js.Integer({ value: 1 }).toBER(false),
+      }),
+    );
+  }
+  if (opts.expiredCertsOnCrl) {
+    exts.push(
+      new pkijs.Extension({
+        extnID: '2.5.29.60',
+        extnValue: new asn1js.GeneralizedTime({ valueDate: opts.expiredCertsOnCrl }).toBER(false),
+      }),
+    );
+  }
+  if (exts.length) crl.crlExtensions = new pkijs.Extensions({ extensions: exts });
+  await crl.sign(signerCa.privateKey, 'SHA-256');
   return new Uint8Array(crl.toSchema(true).toBER(false));
 }
 
@@ -530,5 +565,92 @@ describe('CRL scope and entry semantics', () => {
     const crl = await buildCrl({ entries: [{ serial: signer.pkijsCert, reason: 1, at }] });
     const ltv = await ltvOf([], [crl], new Date(Date.now() - DAY));
     expect(ltv.signerRevocation?.revokedAt?.getTime()).toBe(Math.floor(at.getTime() / 1000) * 1000);
+  });
+});
+
+describe('a scoped or delta CRL still reports the revocations it lists (Opus, 2026-09-24)', () => {
+  const at = new Date(Date.now() - 10 * DAY);
+  test('signer listed in a CRL with a plain issuingDistributionPoint -> revoked', async () => {
+    const crl = await buildCrl({
+      plainIdp: true,
+      entries: [{ serial: signer.pkijsCert, reason: 1, at }],
+    });
+    const ltv = await ltvOf([], [crl], new Date(Date.now() - DAY));
+    expect(ltv.signerRevocation?.revokedAt).toBeDefined();
+  });
+
+  test('signer listed in a delta CRL -> revoked', async () => {
+    const crl = await buildCrl({
+      delta: true,
+      entries: [{ serial: signer.pkijsCert, reason: 1, at }],
+    });
+    const ltv = await ltvOf([], [crl], new Date(Date.now() - DAY));
+    expect(ltv.signerRevocation?.revokedAt).toBeDefined();
+  });
+
+  test('sub CA listed in the root ARL (onlyContainsCACerts) -> CA revocation', async () => {
+    const root = await makeCert('ARL ROOT', '70');
+    const sub = await makeCert('ARL SUB', '71', root, { ca: true });
+    const leaf = await makeCert('ARL LEAF', '72', sub);
+    const arl = await buildCrl({
+      onlyCaCerts: true,
+      issuer: root,
+      entries: [{ serial: sub.pkijsCert, reason: 2, at }],
+    });
+    const ltv = await verifyLtv(
+      [leaf.pkijsCert, sub.pkijsCert, root.pkijsCert],
+      { certs: [], ocsps: [], crls: [arl], vri: {} },
+      new Uint8Array([1]),
+      new Uint8Array(0),
+      { proofTime: new Date(Date.now() - DAY) },
+    );
+    expect(ltv.caRevocation?.revokedAt).toBeDefined();
+  });
+});
+
+describe('favorable evidence issued after the certificate expired proves nothing (Codex + Opus)', () => {
+  const expiredSigner = (cn: string, serial: string) =>
+    makeCert(cn, serial, ca, {
+      notBefore: new Date(Date.now() - 2 * YEAR),
+      notAfter: new Date(Date.now() - 30 * DAY),
+    });
+  const ltvFor = (leaf: pkijs.Certificate, ocsps: Uint8Array[], crls: Uint8Array[]) =>
+    verifyLtv(
+      [leaf, ca.pkijsCert],
+      { certs: [], ocsps, crls, vri: {} },
+      new Uint8Array([1]),
+      new Uint8Array(0),
+      { proofTime: new Date(Date.now() - 60 * DAY) },
+    );
+
+  test('CRL from after expiry that no longer lists the cert -> not evidence', async () => {
+    const expired = await expiredSigner('EXPIRED SIGNER', '80');
+    const ltv = await ltvFor(expired.pkijsCert, [], [await buildCrl({})]);
+    expect(ltv.signerEvidence).toBeUndefined();
+    expect(ltv.retrospectiveValid).toBe(false);
+  });
+
+  test('same CRL declaring ExpiredCertsOnCRL from before expiry -> evidence (control)', async () => {
+    const expired = await expiredSigner('EXPIRED SIGNER 2', '81');
+    const crl = await buildCrl({ expiredCertsOnCrl: new Date(Date.now() - YEAR) });
+    const ltv = await ltvFor(expired.pkijsCert, [], [crl]);
+    expect(ltv.signerEvidence).toBe(true);
+  });
+
+  test('OCSP `good` produced after expiry -> not evidence', async () => {
+    const expired = await expiredSigner('EXPIRED SIGNER 3', '82');
+    const good = await ocspResponse(expired.pkijsCert, ca.pkijsCert, ca);
+    const ltv = await ltvFor(expired.pkijsCert, [good], []);
+    expect(ltv.signerEvidence).toBeUndefined();
+  });
+});
+
+describe('skipped material leaves the check incomplete even with signer evidence (Codex)', () => {
+  test('fresh signer OCSP good + a CRL skipped for size -> incomplete', async () => {
+    const fresh = await ocspResponse(signer.pkijsCert, ca.pkijsCert, ca, {
+      thisUpdate: new Date(Date.now() - DAY),
+    });
+    const ltv = await ltvOf([fresh], [new Uint8Array(100_001)], new Date(Date.now() - 2 * DAY));
+    expect(ltv.revocationIncomplete).toBe(true);
   });
 });

@@ -43,7 +43,7 @@ export type { CertCheckResult, CertCheckOptions } from './certCheck';
 
 // Bump on each release (kept hardcoded — JSON imports require resolveJsonModule
 // + downstream tsconfig coupling we'd rather avoid in this package).
-export const ENGINE_VERSION = '0.10.0';
+export const ENGINE_VERSION = '0.10.1';
 
 /**
  * Dedupe a certificate list by DER fingerprint. Used to merge intermediates
@@ -467,7 +467,10 @@ async function verifyOneSignature(
     // AUTHENTICATED evidence about the signer. Any OCSP/CRL bytes used to
     // suppress it — a revoked signer could embed garbage and never be asked
     // about (Codex, Fable). The fetch is bounded (checkOcsp races a deadline).
-    const hasEmbeddedRevocation = ltvSummary.signerEvidence === true;
+    // ...and only when the embedded scan was complete: skipped material may
+    // hold the very revocation the live check would find.
+    const hasEmbeddedRevocation =
+      ltvSummary.signerEvidence === true && ltvSummary.revocationIncomplete !== true;
     let ocsp: VerificationResult['ocsp'] = { status: 'not_checked', source: 'none' };
     if (
       opts.fetchOcsp !== false &&

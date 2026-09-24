@@ -141,6 +141,35 @@ function coversProofTime(thisUpdate: Date, nextUpdate: Date | undefined, t: Date
   return nextUpdate !== undefined && t.getTime() <= nextUpdate.getTime();
 }
 
+/**
+ * Revocation data issued after a certificate expired proves nothing about
+ * it: CAs purge expired serials from CRLs, and responders may answer `good`
+ * for certs they no longer track. Favorable evidence must be issued while the
+ * certificate was valid.
+ */
+function issuedWhileValid(thisUpdate: Date, subject: Certificate): boolean {
+  return thisUpdate.getTime() <= (subject.notAfter.value as Date).getTime();
+}
+
+const OID_EXPIRED_CERTS_ON_CRL = '2.5.29.60';
+
+/**
+ * A CRL issued after `subject` expired still speaks for it only if it
+ * declares ExpiredCertsOnCRL (RFC 5280 §5.2.x, X.509) from a date no later
+ * than the expiry: then expired serials are kept listed.
+ */
+function crlStillListsExpired(crl: pkijs.CertificateRevocationList, subject: Certificate): boolean {
+  const thisUpdate = crl.thisUpdate.value as Date;
+  if (issuedWhileValid(thisUpdate, subject)) return true;
+  const ext = (crl.crlExtensions?.extensions ?? []).find(
+    (e) => e.extnID === OID_EXPIRED_CERTS_ON_CRL,
+  );
+  if (!ext) return false;
+  const asn = asn1js.fromBER(ext.extnValue.valueBlock.valueHexView.slice().buffer);
+  if (!(asn.result instanceof asn1js.GeneralizedTime)) return false;
+  return asn.result.toDate().getTime() <= (subject.notAfter.value as Date).getTime();
+}
+
 const OID_ISSUING_DISTRIBUTION_POINT = '2.5.29.28';
 const OID_DELTA_CRL_INDICATOR = '2.5.29.27';
 
@@ -500,7 +529,8 @@ export async function verifyLtv(
         if (i === 0) signerEvidence = true;
       } else if (
         parsed.certStatus === 'good' &&
-        coversProofTime(parsed.thisUpdate, parsed.nextUpdate, proofTime)
+        coversProofTime(parsed.thisUpdate, parsed.nextUpdate, proofTime) &&
+        issuedWhileValid(parsed.thisUpdate, subject)
       ) {
         // A `good` only speaks for the window it was issued for: a response
         // from before a revocation cannot vouch for a later signature.
@@ -533,10 +563,10 @@ export async function verifyLtv(
       // DSS material can be appended after signing by anyone: only a CRL the
       // subject's issuer actually signed says anything about the subject.
       if (!(await crlIssuedBy(crl, issuer))) continue;
-      // A partitioned (issuingDistributionPoint) or delta CRL only covers part
-      // of the certificates or changes: the absence of a serial there proves
-      // nothing, and a delta's removeFromCRL is a release, not a revocation.
-      if (crlScopeUnsupported(crl)) continue;
+      // A listed serial is a revocation whatever the CRL's scope (a root's ARL
+      // is scoped to CA certs by design). The scope only limits the favorable
+      // reading: in a partitioned (issuingDistributionPoint) or delta CRL the
+      // ABSENCE of a serial proves nothing. removeFromCRL is a release.
       const found = isCertRevoked(parseCert(subject), crl);
       const status = found.reason === 'removeFromCRL' ? { revoked: false as const } : found;
       if (status.revoked) {
@@ -546,7 +576,11 @@ export async function verifyLtv(
         linkRevoked = true;
         if (i === 0) signerRevocation = earlierRevocation(signerRevocation, status.revokedAt);
         else caRevocation = earlierRevocation(caRevocation, status.revokedAt);
-      } else if (coversProofTime(crl.thisUpdate.value, crl.nextUpdate?.value, proofTime)) {
+      } else if (
+        !crlScopeUnsupported(crl) &&
+        coversProofTime(crl.thisUpdate.value, crl.nextUpdate?.value, proofTime) &&
+        crlStillListsExpired(crl, subject)
+      ) {
         retrospectiveValid = true;
         if (i === 0) signerEvidence = true;
       }
@@ -602,7 +636,10 @@ export async function verifyLtv(
   if (signerEvidence) result.signerEvidence = true;
   // Incomplete: the scan was cut, or material was skipped (size caps) and
   // nothing that was read settles the signer's status.
-  if (budgetTripped || (sizeSkipped && !signerEvidence)) result.revocationIncomplete = true;
+  // Incomplete: the scan was cut, or material was skipped (size caps). What
+  // was skipped could list a revocation of the signer or of a CA, so neither
+  // counts as settled; the caller then asks the live responder.
+  if (budgetTripped || sizeSkipped) result.revocationIncomplete = true;
   if (documentTimestamp) result.documentTimestamp = documentTimestamp;
   return result;
 }
