@@ -1,6 +1,5 @@
 ---
 import BreadcrumbList from '../components/BreadcrumbList.astro';
-import TopicLinks from '../components/TopicLinks.astro';
 import { getLangFromUrl } from '../i18n/utils.ts';
 import { SITE, breadcrumbList } from '../lib/jsonld.ts';
 import Base from './Base.astro';
@@ -31,7 +30,6 @@ const jsonld = breadcrumbs.length > 0 ? [breadcrumbList(fullCrumbs)] : [];
     {breadcrumbs.length > 0 && <BreadcrumbList items={fullCrumbs} />}
     {h1 && <h1 class="mt-4 mb-6">{h1}</h1>}
     <slot />
-    <TopicLinks />
   </article>
   <!-- Secciones full-width (fuera del ancho prose) que una página cuelga bajo su contenido. -->
   <slot name="after" />

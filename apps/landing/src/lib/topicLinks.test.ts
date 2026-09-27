@@ -5,6 +5,17 @@ const link = { href: '/respuestas/firmar/', anchor: 'Cómo firmar' };
 const routes = new Set(['/respuestas/firmar/']);
 
 describe('selectTopicLinks', () => {
+  it('selecciona los enlaces de la home sin confundirlos con otras rutas', () => {
+    const homeLink = { href: '/', anchor: 'Inicio' };
+    const data = { '/': [link], '/en/': [homeLink] };
+    const knownRoutes = new Set([...routes, '/']);
+
+    expect(selectTopicLinks(data, '/', knownRoutes)).toEqual([link]);
+    expect(selectTopicLinks(data, '/en/', knownRoutes)).toEqual([homeLink]);
+    expect(selectTopicLinks(data, '/sin-entrada/', knownRoutes)).toEqual([]);
+    expect(selectTopicLinks({}, '/', knownRoutes)).toEqual([]);
+  });
+
   it.each(['/pilar', '/pilar/'])('normaliza la ruta actual %s', (path) => {
     expect(selectTopicLinks({ '/pilar/': [link] }, path, routes)).toEqual([link]);
     expect(selectTopicLinks({ '/pilar': [link] }, path, routes)).toEqual([link]);
