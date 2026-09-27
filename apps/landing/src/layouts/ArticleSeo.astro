@@ -1,6 +1,5 @@
 ---
 import BreadcrumbList from '../components/BreadcrumbList.astro';
-import TopicLinks from '../components/TopicLinks.astro';
 import { getLangFromUrl } from '../i18n/utils.ts';
 import { SITE, breadcrumbList, faqPage, techArticle } from '../lib/jsonld.ts';
 import Base from './Base.astro';
@@ -89,6 +88,5 @@ const jsonld = [
         </ul>
       </aside>
     )}
-    <TopicLinks />
   </article>
 </Base>
