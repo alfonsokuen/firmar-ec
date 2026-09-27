@@ -1,0 +1,26 @@
+---
+import { getCollection } from 'astro:content';
+import topicLinks from '../data/topic-links.json';
+import { selectTopicLinks } from '../lib/topicLinks.ts';
+
+// Derive routes from the same sources as Astro, including generated answer pages.
+const staticPages = Object.keys(import.meta.glob('../pages/**/*.astro'));
+const knownRoutes = new Set(
+  staticPages
+    .filter((path) => !path.includes('['))
+    .map((path) => `${path.replace('../pages', '').replace(/\.astro$/, '').replace(/\/index$/, '')}/`),
+);
+const answers = await getCollection('respuestas');
+for (const answer of answers) knownRoutes.add(`/respuestas/${answer.id}/`);
+const links = selectTopicLinks(topicLinks, Astro.url.pathname, knownRoutes);
+---
+{links.length > 0 && (
+  <section aria-labelledby="topic-links-heading" class="mt-16 pt-8 border-t border-ink-200 dark:border-ink-800 not-prose">
+    <h2 id="topic-links-heading" class="font-display text-xl font-semibold leading-snug mb-4">Guías relacionadas</h2>
+    <ul class="space-y-2">
+      {links.map((link) => (
+        <li><a class="text-brand-500 hover:underline" href={link.href}>{link.anchor}</a></li>
+      ))}
+    </ul>
+  </section>
+)}
