@@ -45,6 +45,11 @@ export default defineConfig({
       '**/dist/**',
       '**/.astro/**',
       '**/e2e/**',
+      // Los worktrees de Claude Code son checkouts sin `node_modules`: vitest
+      // recogia sus specs y fallaba al resolver cada import (pkijs, pdf-lib,
+      // node-forge...). 72 de 73 ficheros en rojo venian de aqui, no del codigo.
+      // `biome.json` ya los ignoraba; esta config no.
+      '**/.claude/worktrees/**',
       // Los specs del Service Worker corren con Playwright y su propio
       // config (`apps/pwa/playwright.sw.config.ts`, script `test:e2e:sw`):
       // necesitan un SW real, que `vite dev` no emite. Vitest los recogia
