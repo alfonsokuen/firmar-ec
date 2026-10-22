@@ -63,7 +63,7 @@ import { detectSignatures } from './detectExistingSignatures.js';
 import { SignerError, isEncryptedPdfError } from './errors.js';
 import type { PadesSignOptions } from './pades.js';
 import { createQrLink } from './qrLink.js';
-import { buildQrPayload, subjectDnFromDer } from './qrPayload.js';
+import { fitQrPayload, subjectDnFromDer } from './qrPayload.js';
 import { fitChars, toWinAnsiHex, truncateToWidth } from './textFit.js';
 import type { ParsedPfx, SigAlg } from './types.js';
 import { buildVerifyQrUrl } from './verifyUrl.js';
@@ -325,12 +325,15 @@ export async function addIncrementalSignature(
       .join('')
       .slice(0, 12);
     const qrUrl = buildVerifyQrUrl(hashHex);
-    const qrPayload = buildQrPayload({
-      signerName: name,
-      subjectDn: subjectDnFromDer(parsedPfx.signingCert.der),
-      verifyUrl: qrUrl,
-      signingTime,
-    });
+    const qrPayload = fitQrPayload(
+      {
+        signerName: name,
+        subjectDn: subjectDnFromDer(parsedPfx.signingCert.der),
+        verifyUrl: qrUrl,
+        signingTime,
+      },
+      qrAreaPt,
+    );
 
     const fontSize = 7;
     const lineGap = fontSize + 2;

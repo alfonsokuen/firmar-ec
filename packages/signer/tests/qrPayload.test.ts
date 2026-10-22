@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import QRCode from 'qrcode';
 /**
  * El texto que lleva el QR de cada PDF firmado. Los usuarios pidieron que al
  * escanearlo se vea lo mismo que muestra el QR de la firma de Security Data /
@@ -14,7 +15,13 @@ import { fileURLToPath } from 'node:url';
  */
 import { describe, expect, it } from 'vitest';
 import { parsePfx } from '../src/p12.js';
-import { buildQrPayload, formatIsoWithOffset, subjectDnFromDer } from '../src/qrPayload.js';
+import {
+  MIN_QR_MODULE_PT,
+  buildQrPayload,
+  fitQrPayload,
+  formatIsoWithOffset,
+  subjectDnFromDer,
+} from '../src/qrPayload.js';
 
 const FIX_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const PIN = 'test1234';
@@ -87,5 +94,44 @@ describe('subjectDnFromDer', () => {
   });
   it('un DER inválido devuelve cadena vacía, sin lanzar', () => {
     expect(subjectDnFromDer(new Uint8Array([1, 2, 3]))).toBe('');
+  });
+});
+
+describe('fitQrPayload: el QR tiene que seguir siendo legible y la firma no puede abortar', () => {
+  const sampleDn =
+    'C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=1723252472-161024133707, CN=DIANA CAROLINA BENALCAZAR CHINACALLE';
+  const input = (over: Partial<Parameters<typeof buildQrPayload>[0]> = {}) => ({
+    signerName: 'DIANA CAROLINA BENALCAZAR CHINACALLE',
+    subjectDn: sampleDn,
+    verifyUrl: 'https://app.firmar.ec/#/verificar?h=abc123def456',
+    signingTime: new Date(Date.UTC(2026, 9, 21, 14, 26, 4, 492)),
+    offsetMinutes: -300,
+    ...over,
+  });
+  const sizeOf = (text: string) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules.size;
+
+  it('con el DN de la muestra y 60 pt usa el texto completo', () => {
+    expect(fitQrPayload(input(), 60)).toBe(buildQrPayload(input()));
+  });
+
+  it('un DN largo (con tildes) pasa a CN + SERIALNUMBER y sigue con el texto de 6 líneas', () => {
+    const longDn = `${sampleDn}, OU=${'UNIDAD DE CERTIFICACIÓN Ñ '.repeat(20)}`;
+    const out = fitQrPayload(input({ subjectDn: longDn }), 60);
+    expect(out).not.toBe(buildQrPayload(input({ subjectDn: longDn })));
+    expect(out).toContain(
+      'RAZON: SERIALNUMBER=1723252472-161024133707, CN=DIANA CAROLINA BENALCAZAR CHINACALLE\n',
+    );
+    expect(out.split('\n')).toHaveLength(6);
+    expect(sizeOf(out)).toBeLessThanOrEqual(Math.floor(60 / MIN_QR_MODULE_PT));
+  });
+
+  it('un texto que no cabe en NINGUNA versión del QR vuelve a la URL sola, sin lanzar', () => {
+    const out = fitQrPayload(input({ signerName: 'Ñ'.repeat(3000), subjectDn: '' }), 60);
+    expect(out).toBe('https://app.firmar.ec/#/verificar?h=abc123def456');
+  });
+
+  it('un área más pequeña (40 pt) nunca produce módulos por debajo del mínimo legible', () => {
+    const out = fitQrPayload(input(), 40);
+    expect(sizeOf(out)).toBeLessThanOrEqual(Math.floor(40 / MIN_QR_MODULE_PT));
   });
 });

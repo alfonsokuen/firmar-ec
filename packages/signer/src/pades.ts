@@ -35,7 +35,7 @@ import {
 import { buildCmsSignedData } from './cms.js';
 import { SignerError, isEncryptedPdfError, revokedError } from './errors.js';
 import { collectLtvData, extractSignatureContents } from './ltv.js';
-import { buildQrPayload, subjectDnFromDer } from './qrPayload.js';
+import { fitQrPayload, subjectDnFromDer } from './qrPayload.js';
 import type {
   LtvMeta,
   LtvOpts,
@@ -48,6 +48,7 @@ import type {
 import { buildVerifyQrUrl } from './verifyUrl.js';
 import {
   type VisibleSigInput,
+  __internals,
   attachVisibleSignatureAppearance,
   embedHelvetica,
   validateVisibleSig,
@@ -282,12 +283,15 @@ export async function signPdfPades(
     const qrUrl = buildVerifyQrUrl(hashHex);
     // El QR lleva el texto con quién firmó, el DN del certificado y la fecha
     // (como el QR de Security Data/FirmaEC); el enlace de verificación va dentro.
-    const qrPayload = buildQrPayload({
-      signerName: parsedPfx.signingCert.subjectCN,
-      subjectDn: subjectDnFromDer(parsedPfx.signingCert.der),
-      verifyUrl: qrUrl,
-      signingTime,
-    });
+    const qrPayload = fitQrPayload(
+      {
+        signerName: parsedPfx.signingCert.subjectCN,
+        subjectDn: subjectDnFromDer(parsedPfx.signingCert.der),
+        verifyUrl: qrUrl,
+        signingTime,
+      },
+      __internals.QR_AREA_PT,
+    );
 
     attachVisibleSignatureAppearance(
       pdfDoc,

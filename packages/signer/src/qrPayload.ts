@@ -11,6 +11,7 @@
  * declara al firmar. La verificación criptográfica la hace el verificador.
  */
 import { decodeAsn1DirectoryString, parseCertificateDer } from '@firma-ec/crypto-core';
+import QRCode from 'qrcode';
 
 /** Etiqueta de la línea LOCALIZACION; el nombre del producto, no una entidad certificadora. */
 export const QR_SIGNED_WITH = 'firmar.ec';
@@ -99,4 +100,48 @@ export function buildQrPayload(input: QrPayloadInput): string {
     'FECHA: ',
     formatIsoWithOffset(input.signingTime, offset),
   ].join('\n');
+}
+
+/**
+ * Módulo mínimo (pt) para que el QR siga siendo leíble a pantalla e impreso:
+ * con 0,8 pt un módulo mide ~0,28 mm. Por debajo, un lector de teléfono ya no
+ * lo resuelve sin zoom. En una caja de 60 pt eso permite hasta 75 módulos
+ * (versión 14); el DN de Security Data (~340 bytes) ocupa 69.
+ */
+export const MIN_QR_MODULE_PT = 0.8;
+
+/** Deja solo SERIALNUMBER y CN del DN, en su orden: lo que identifica al firmante. */
+function compactDn(dn: string): string {
+  const parts = dn.split(/, (?=[A-Za-z0-9.]+=)/);
+  const kept = parts.filter((part) => part.startsWith('SERIALNUMBER=') || part.startsWith('CN='));
+  return kept.join(', ');
+}
+
+/** Módulos por lado del QR de `text`, o `null` si la librería no puede codificarlo. */
+function qrModules(text: string): number | null {
+  try {
+    return QRCode.create(text, { errorCorrectionLevel: 'M' }).modules.size;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * El texto del QR más completo que cabe en `areaPt` con módulos legibles.
+ * Orden: texto completo, texto con el DN reducido a SERIALNUMBER + CN, y por
+ * último la URL de verificación sola (la de siempre, que cabe en cualquier
+ * caja). Nunca lanza: un QR que no se puede ampliar no es motivo para abortar
+ * una firma.
+ */
+export function fitQrPayload(input: QrPayloadInput, areaPt: number): string {
+  const maxModules = Math.floor(areaPt / MIN_QR_MODULE_PT);
+  const candidates = [
+    buildQrPayload(input),
+    buildQrPayload({ ...input, subjectDn: compactDn(input.subjectDn) }),
+  ];
+  for (const candidate of candidates) {
+    const modules = qrModules(candidate);
+    if (modules !== null && modules <= maxModules) return candidate;
+  }
+  return input.verifyUrl;
 }
