@@ -41,9 +41,9 @@ describe('formatIsoWithOffset', () => {
 
 describe('buildQrPayload', () => {
   const base = {
-    signerName: 'DIANA CAROLINA BENALCAZAR CHINACALLE',
+    signerName: 'LUCIA FERNANDA TORRES MENDOZA SUAREZ',
     subjectDn:
-      'C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=1723252472-161024133707, CN=DIANA CAROLINA BENALCAZAR CHINACALLE',
+      'C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=0000000000-000000000000, CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ',
     verifyUrl: 'https://app.firmar.ec/#/verificar?h=abc123def456',
     signingTime: new Date(Date.UTC(2026, 9, 21, 14, 26, 4, 492)),
     offsetMinutes: -300,
@@ -51,8 +51,8 @@ describe('buildQrPayload', () => {
 
   it('replica la estructura del QR de Security Data/FirmaEC, byte a byte', () => {
     expect(buildQrPayload(base)).toBe(
-      'FIRMADO POR: DIANA CAROLINA BENALCAZAR CHINACALLE\n' +
-        'RAZON: C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=1723252472-161024133707, CN=DIANA CAROLINA BENALCAZAR CHINACALLE\n' +
+      'FIRMADO POR: LUCIA FERNANDA TORRES MENDOZA SUAREZ\n' +
+        'RAZON: C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=0000000000-000000000000, CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ\n' +
         'LOCALIZACION: Firmado digitalmente con firmar.ec\n' +
         'https://app.firmar.ec/#/verificar?h=abc123def456\n' +
         'FECHA: \n' +
@@ -72,7 +72,7 @@ describe('buildQrPayload', () => {
 
   it('con un DN vacío conserva la línea RAZON con el nombre como respaldo', () => {
     const p = buildQrPayload({ ...base, subjectDn: '' });
-    expect(p).toContain('RAZON: CN=DIANA CAROLINA BENALCAZAR CHINACALLE\n');
+    expect(p).toContain('RAZON: CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ\n');
   });
 
   it('no afirma que el documento o el certificado estén verificados o sean válidos', () => {
@@ -99,9 +99,9 @@ describe('subjectDnFromDer', () => {
 
 describe('fitQrPayload: el QR tiene que seguir siendo legible y la firma no puede abortar', () => {
   const sampleDn =
-    'C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=1723252472-161024133707, CN=DIANA CAROLINA BENALCAZAR CHINACALLE';
+    'C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=0000000000-000000000000, CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ';
   const input = (over: Partial<Parameters<typeof buildQrPayload>[0]> = {}) => ({
-    signerName: 'DIANA CAROLINA BENALCAZAR CHINACALLE',
+    signerName: 'LUCIA FERNANDA TORRES MENDOZA SUAREZ',
     subjectDn: sampleDn,
     verifyUrl: 'https://app.firmar.ec/#/verificar?h=abc123def456',
     signingTime: new Date(Date.UTC(2026, 9, 21, 14, 26, 4, 492)),
@@ -119,7 +119,7 @@ describe('fitQrPayload: el QR tiene que seguir siendo legible y la firma no pued
     const out = fitQrPayload(input({ subjectDn: longDn }), 60);
     expect(out).not.toBe(buildQrPayload(input({ subjectDn: longDn })));
     expect(out).toContain(
-      'RAZON: SERIALNUMBER=1723252472-161024133707, CN=DIANA CAROLINA BENALCAZAR CHINACALLE\n',
+      'RAZON: SERIALNUMBER=0000000000-000000000000, CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ\n',
     );
     expect(out.split('\n')).toHaveLength(6);
     expect(sizeOf(out)).toBeLessThanOrEqual(Math.floor(60 / MIN_QR_MODULE_PT));

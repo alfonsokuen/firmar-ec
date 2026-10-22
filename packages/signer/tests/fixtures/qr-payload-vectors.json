@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "minModulePt": 0.8,
+  "cases": [
+    {
+      "name": "security-data-sample",
+      "signerName": "LUCIA FERNANDA TORRES MENDOZA SUAREZ",
+      "subjectDn": "C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=0000000000-000000000000, CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-10-21T14:26:04.492Z",
+      "offsetMinutes": -300,
+      "areaPt": 60,
+      "expected": "FIRMADO POR: LUCIA FERNANDA TORRES MENDOZA SUAREZ\nRAZON: C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=0000000000-000000000000, CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ\nLOCALIZACION: Firmado digitalmente con firmar.ec\nhttps://app.firmar.ec/#/verificar?h=abc123def456\nFECHA: \n2026-10-21T09:26:04.492-05:00"
+    },
+    {
+      "name": "test-fixture-short-dn",
+      "signerName": "Test Signer RSA-2048",
+      "subjectDn": "CN=Test Signer RSA-2048, C=EC, O=firma-ec test fixture",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-10-21T14:26:04.492Z",
+      "offsetMinutes": -300,
+      "areaPt": 60,
+      "expected": "FIRMADO POR: Test Signer RSA-2048\nRAZON: CN=Test Signer RSA-2048, C=EC, O=firma-ec test fixture\nLOCALIZACION: Firmado digitalmente con firmar.ec\nhttps://app.firmar.ec/#/verificar?h=abc123def456\nFECHA: \n2026-10-21T09:26:04.492-05:00"
+    },
+    {
+      "name": "long-dn-with-accents-falls-back-to-serial-and-cn",
+      "signerName": "MARÍA JOSÉ NÚÑEZ PEÑAHERRERA DE LA TORRE",
+      "subjectDn": "C=EC, O=ENTIDAD DE CERTIFICACIÓN Y SERVICIOS RELACIONADOS DEL ECUADOR SOCIEDAD ANÓNIMA, OU=UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ UNIDAD DE CERTIFICACIÓN Ñ , SERIALNUMBER=0000000000-000000000000, CN=MARÍA JOSÉ NÚÑEZ PEÑAHERRERA DE LA TORRE",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-10-21T14:26:04.492Z",
+      "offsetMinutes": -300,
+      "areaPt": 60,
+      "expected": "FIRMADO POR: MARÍA JOSÉ NÚÑEZ PEÑAHERRERA DE LA TORRE\nRAZON: SERIALNUMBER=0000000000-000000000000, CN=MARÍA JOSÉ NÚÑEZ PEÑAHERRERA DE LA TORRE\nLOCALIZACION: Firmado digitalmente con firmar.ec\nhttps://app.firmar.ec/#/verificar?h=abc123def456\nFECHA: \n2026-10-21T09:26:04.492-05:00"
+    },
+    {
+      "name": "too-big-falls-back-to-url-only",
+      "signerName": "ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ",
+      "subjectDn": "",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-10-21T14:26:04.492Z",
+      "offsetMinutes": -300,
+      "areaPt": 60,
+      "expected": "https://app.firmar.ec/#/verificar?h=abc123def456"
+    },
+    {
+      "name": "small-area-40pt",
+      "signerName": "LUCIA FERNANDA TORRES MENDOZA SUAREZ",
+      "subjectDn": "C=EC, O=SECURITY DATA S.A. 2, OU=ENTIDAD DE CERTIFICACION DE INFORMACION, SERIALNUMBER=0000000000-000000000000, CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-10-21T14:26:04.492Z",
+      "offsetMinutes": -300,
+      "areaPt": 40,
+      "expected": "https://app.firmar.ec/#/verificar?h=abc123def456"
+    },
+    {
+      "name": "offset-plus-0530",
+      "signerName": "A B",
+      "subjectDn": "CN=A B",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-01-02T03:04:05.006Z",
+      "offsetMinutes": 330,
+      "areaPt": 60,
+      "expected": "FIRMADO POR: A B\nRAZON: CN=A B\nLOCALIZACION: Firmado digitalmente con firmar.ec\nhttps://app.firmar.ec/#/verificar?h=abc123def456\nFECHA: \n2026-01-02T08:34:05.006+05:30"
+    },
+    {
+      "name": "offset-zero",
+      "signerName": "A B",
+      "subjectDn": "CN=A B",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-01-02T03:04:05.006Z",
+      "offsetMinutes": 0,
+      "areaPt": 60,
+      "expected": "FIRMADO POR: A B\nRAZON: CN=A B\nLOCALIZACION: Firmado digitalmente con firmar.ec\nhttps://app.firmar.ec/#/verificar?h=abc123def456\nFECHA: \n2026-01-02T03:04:05.006+00:00"
+    },
+    {
+      "name": "control-chars-and-newlines-are-flattened",
+      "signerName": "A\nB\u0000C",
+      "subjectDn": "CN=X\r\nY",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-10-21T14:26:04.492Z",
+      "offsetMinutes": -300,
+      "areaPt": 60,
+      "expected": "FIRMADO POR: A B C\nRAZON: CN=X Y\nLOCALIZACION: Firmado digitalmente con firmar.ec\nhttps://app.firmar.ec/#/verificar?h=abc123def456\nFECHA: \n2026-10-21T09:26:04.492-05:00"
+    },
+    {
+      "name": "empty-dn-uses-cn-fallback",
+      "signerName": "LUCIA FERNANDA TORRES MENDOZA SUAREZ",
+      "subjectDn": "",
+      "verifyUrl": "https://app.firmar.ec/#/verificar?h=abc123def456",
+      "signingTimeUtc": "2026-10-21T14:26:04.492Z",
+      "offsetMinutes": -300,
+      "areaPt": 60,
+      "expected": "FIRMADO POR: LUCIA FERNANDA TORRES MENDOZA SUAREZ\nRAZON: CN=LUCIA FERNANDA TORRES MENDOZA SUAREZ\nLOCALIZACION: Firmado digitalmente con firmar.ec\nhttps://app.firmar.ec/#/verificar?h=abc123def456\nFECHA: \n2026-10-21T09:26:04.492-05:00"
+    }
+  ]
+}
