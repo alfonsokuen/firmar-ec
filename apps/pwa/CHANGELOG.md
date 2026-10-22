@@ -1,5 +1,11 @@
 # PWA changelog
 
+## 0.29.0 — 2026-10-22
+
+- El QR de la estampa de firma ahora muestra, al escanearlo, lo mismo que el de FirmaEC y Security Data: quién firmó, el DN completo del certificado, con qué se firmó y la fecha, más el enlace de verificación en su propia línea. Antes solo llevaba el enlace. El QR es un dato declarado por el firmante: no verifica el documento ni el certificado (eso lo hace el verificador).
+- Si el texto no cabe con módulos legibles (al menos 0,8 pt), el QR baja primero a nombre + número de serie y, como último recurso, al enlace solo; la firma nunca se aborta por el QR. La anotación de enlace sobre el QR sigue apuntando al verificador.
+- Firmador 0.13.0.
+
 ## 0.28.4 — 2026-09-24
 
 - Motor de verificación 0.10.4: una CRL demasiado grande para leerla entera que puede ser indirecta, o cuyo emisor comparte nombre con una CA de la cadena, deja pendiente también la revisión de las CA (una respuesta en vivo sobre el firmante no la resuelve); sin aviso de «revocación no verificada» por CRL ajenas a la firma.
