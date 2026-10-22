@@ -35,6 +35,7 @@ import {
 import { buildCmsSignedData } from './cms.js';
 import { SignerError, isEncryptedPdfError, revokedError } from './errors.js';
 import { collectLtvData, extractSignatureContents } from './ltv.js';
+import { buildQrPayload, subjectDnFromDer } from './qrPayload.js';
 import type {
   LtvMeta,
   LtvOpts,
@@ -279,12 +280,21 @@ export async function signPdfPades(
     // on the SPA hash route. Older signed PDFs (F3–F6.2) used the apex
     // (firmar.ec) which the landing now redirects via inline script.
     const qrUrl = buildVerifyQrUrl(hashHex);
+    // El QR lleva el texto con quién firmó, el DN del certificado y la fecha
+    // (como el QR de Security Data/FirmaEC); el enlace de verificación va dentro.
+    const qrPayload = buildQrPayload({
+      signerName: parsedPfx.signingCert.subjectCN,
+      subjectDn: subjectDnFromDer(parsedPfx.signingCert.der),
+      verifyUrl: qrUrl,
+      signingTime,
+    });
 
     attachVisibleSignatureAppearance(
       pdfDoc,
       {
         ...opts.visibleSig,
         qrUrl,
+        qrPayload,
         signingTime,
         reason: opts.reason,
       },

@@ -24,6 +24,7 @@ export { createOcspCache, createCrlCache } from '@firma-ec/ltv-validation';
 export type { OcspCache, CrlCache } from '@firma-ec/ltv-validation';
 export { addIncrementalSignature } from './incrementalUpdate.js';
 export { VERIFY_QR_BASE, buildVerifyQrUrl } from './verifyUrl.js';
+export { buildQrPayload, subjectDnFromDer, formatIsoWithOffset } from './qrPayload.js';
 export {
   attachVisibleSignatureAppearance,
   buildAppearanceOperators,

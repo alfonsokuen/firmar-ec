@@ -88,6 +88,11 @@ export interface VisibleSigInput {
    * legacy single-line layout is used (back-compat with v0.4.4 tests).
    */
   qrUrl?: string | undefined;
+  /**
+   * Texto que codifica la matriz del QR (ver `qrPayload.ts`). Si falta, la matriz
+   * codifica `qrUrl`. El enlace sobre el QR usa SIEMPRE `qrUrl`.
+   */
+  qrPayload?: string | undefined;
   /** v0.4.5 — Signing time used for L2 "Fecha:" line. Defaults to `new Date()`. */
   signingTime?: Date | undefined;
   /** v0.4.5 — Reason rendered in L3. Defaults to "firmar.ec". */
@@ -348,6 +353,7 @@ export function buildAppearanceOperators(
   signerCN: string,
   opts: {
     qrUrl?: string | undefined;
+    qrPayload?: string | undefined;
     signingTime?: Date | undefined;
     reason?: string | undefined;
     signerId?: string | undefined;
@@ -370,7 +376,7 @@ export function buildAppearanceOperators(
     // translation via `1 0 0 1 tx ty cm`. pdf-lib expects PDFOperator; we use
     // PDFOperator.of(name, args) — see helpers. Since `cm` isn't exported as a
     // helper, we fall back to coordinate offsetting at the rectangle level.
-    const qrOps = buildQrOperators(opts.qrUrl, QR_AREA_PT);
+    const qrOps = buildQrOperators(opts.qrPayload ?? opts.qrUrl, QR_AREA_PT);
     // Offset every rectangle op by (PADDING_PT, PADDING_PT). PDFOperator name
     // for rectangle() is 're' with args [x, y, w, h] (PDFNumber objects).
     for (const op of qrOps) {
@@ -618,6 +624,7 @@ export function attachVisibleSignatureAppearance(
   // so they use apWidth/apHeight, not the physical spec.width/height.
   const ops = buildAppearanceOperators(apWidth, apHeight, spec.signerCN, {
     qrUrl: spec.qrUrl,
+    qrPayload: spec.qrPayload,
     signingTime: spec.signingTime,
     reason: spec.reason,
     signerId: spec.signerId,

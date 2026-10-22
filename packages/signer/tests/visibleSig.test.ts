@@ -332,6 +332,13 @@ describe('signPdfPades — visible-sig rendering', () => {
     return hex.toLowerCase();
   }
 
+  // Solo los operandos hexadecimales de los Tj: el volcado completo también trae
+  // las coordenadas del QR, y el texto del QR (ahora largo) hace que aparezca «85»
+  // dentro de un número («6.85…») sin que haya elipsis. La elipsis viaja en un Tj.
+  function textHexOf(dump: string): string {
+    return [...dump.matchAll(/<([0-9a-f]+)>/g)].map((m) => m[1]).join('');
+  }
+
   async function stampTextOf(signerCN: string, width = 240, height = 72): Promise<string> {
     const pfx = await parsePfx(loadFixture('rsa2048-valid.p12'), PIN);
     const pdf = await buildA4Pdf();
@@ -372,7 +379,7 @@ describe('signPdfPades — visible-sig rendering', () => {
       expect(dump).toContain(winAnsiHex(word));
     }
     // Y no hay elipsis: repartir no es recortar.
-    expect(dump).not.toContain(winAnsiHex('…'));
+    expect(textHexOf(dump)).not.toContain(winAnsiHex('…'));
   });
 
   it('un nombre que SÍ cabe sale en una sola línea, sin cambiar nada', async () => {
@@ -380,7 +387,7 @@ describe('signPdfPades — visible-sig rendering', () => {
     expect(measureHelvetica(`Firmado por: ${cn}`, 8)).toBeLessThan(162); // premisa
     const dump = await stampTextOf(cn);
     expect(dump).toContain(winAnsiHex(`Firmado por: ${cn}`));
-    expect(dump).not.toContain(winAnsiHex('…'));
+    expect(textHexOf(dump)).not.toContain(winAnsiHex('…'));
   });
 
   it('un CN sin espacios que no cabe se recorta por ANCHO, con elipsis legible', async () => {
@@ -391,7 +398,7 @@ describe('signPdfPades — visible-sig rendering', () => {
     expect(dump).not.toContain(winAnsiHex(`Firmado por: ${longCN}`));
     // La elipsis viaja como 0x85 (WinAnsi). Con el `& 0xff` de antes salía 0x26,
     // es decir un '&' al final del nombre.
-    expect(dump).toContain('85');
+    expect(textHexOf(dump)).toContain('85');
     expect(dump).not.toContain(winAnsiHex(`Firmado por: ${'X'.repeat(34)}`) + '26');
   });
 

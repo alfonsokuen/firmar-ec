@@ -63,6 +63,7 @@ import { detectSignatures } from './detectExistingSignatures.js';
 import { SignerError, isEncryptedPdfError } from './errors.js';
 import type { PadesSignOptions } from './pades.js';
 import { createQrLink } from './qrLink.js';
+import { buildQrPayload, subjectDnFromDer } from './qrPayload.js';
 import { fitChars, toWinAnsiHex, truncateToWidth } from './textFit.js';
 import type { ParsedPfx, SigAlg } from './types.js';
 import { buildVerifyQrUrl } from './verifyUrl.js';
@@ -324,6 +325,12 @@ export async function addIncrementalSignature(
       .join('')
       .slice(0, 12);
     const qrUrl = buildVerifyQrUrl(hashHex);
+    const qrPayload = buildQrPayload({
+      signerName: name,
+      subjectDn: subjectDnFromDer(parsedPfx.signingCert.der),
+      verifyUrl: qrUrl,
+      signingTime,
+    });
 
     const fontSize = 7;
     const lineGap = fontSize + 2;
@@ -352,7 +359,7 @@ export async function addIncrementalSignature(
 
     // Build QR operators: each dark module → filled rect. Coalesce horizontal
     // runs per row into a single rect to shrink the op stream.
-    const qr = QRCode.create(qrUrl, { errorCorrectionLevel: 'M' });
+    const qr = QRCode.create(qrPayload, { errorCorrectionLevel: 'M' });
     const size = qr.modules.size;
     const data = qr.modules.data;
     const moduleSize = qrAreaPt / size;
