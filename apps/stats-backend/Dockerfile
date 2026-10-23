@@ -3,7 +3,7 @@
 # Public usage-stats service (Fastify + Prisma + Redis). Replaces the KV worker.
 
 # ---------- deps ----------
-FROM node:22-alpine AS deps
+FROM node:22.23.4-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 # Workspace manifests first (better layer cache). .npmrc is REQUIRED here: it
@@ -15,7 +15,7 @@ COPY apps/stats-backend/package.json apps/stats-backend/
 RUN pnpm install --frozen-lockfile
 
 # ---------- build ----------
-FROM node:22-alpine AS build
+FROM node:22.23.4-alpine AS build
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 # Bring node_modules from deps stage (workspace + per-package)
@@ -30,12 +30,12 @@ RUN pnpm -F @firma-ec/stats-backend prisma:generate
 RUN pnpm -F @firma-ec/stats-backend build
 
 # ---------- runtime ----------
-FROM node:22-alpine AS runtime
+FROM node:22.23.4-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
-RUN apk add --no-cache wget tini
+RUN apk upgrade --no-cache ca-certificates && apk add --no-cache wget tini
 # Preserve the pnpm workspace layout so the externalized @prisma/client (and its
 # native linux-musl query engine, generated in the build stage for THIS platform)
 # resolves at runtime via the app's node_modules symlinks into the root .pnpm

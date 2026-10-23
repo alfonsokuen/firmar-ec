@@ -13,7 +13,7 @@
 # the first build failed with a wall of "Could not resolve @firma-ec/crypto-core".
 # Installing in the same stage that holds the sources keeps the link farm intact.
 
-FROM node:22-alpine AS build
+FROM node:22.23.4-alpine AS build
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
@@ -49,12 +49,12 @@ COPY apps/verify-api ./apps/verify-api
 RUN pnpm -F @firma-ec/verify-api build
 
 # ---------- runtime ----------
-FROM node:22-alpine AS runtime
+FROM node:22.23.4-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
-RUN apk add --no-cache wget tini
+RUN apk upgrade --no-cache ca-certificates && apk add --no-cache wget tini
 # Marks the bundle as ESM. Without it Node re-parses each file after failing to
 # read it as CommonJS and warns on every boot.
 RUN printf '{"type":"module"}' > /app/package.json

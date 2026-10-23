@@ -3,7 +3,7 @@
 # F3.5 T29 — WhatsApp inbox (Fastify + Prisma + Redis + R2)
 
 # ---------- deps ----------
-FROM node:22-alpine AS deps
+FROM node:22.23.4-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 # Workspace manifests first (better layer cache)
@@ -13,7 +13,7 @@ COPY packages/inbox-crypto/package.json packages/inbox-crypto/
 RUN pnpm install --frozen-lockfile
 
 # ---------- build ----------
-FROM node:22-alpine AS build
+FROM node:22.23.4-alpine AS build
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 # Bring node_modules from deps stage (workspace + per-package)
@@ -30,14 +30,14 @@ RUN pnpm -F @firma-ec/inbox-backend prisma:generate
 RUN pnpm -F @firma-ec/inbox-backend build
 
 # ---------- runtime ----------
-FROM node:22-alpine AS runtime
+FROM node:22.23.4-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 # R2 + aws-sdk-s3 ≥1.196 flexible-checksums workaround (memoria workspace)
 ENV AWS_REQUEST_CHECKSUM_CALCULATION=WHEN_REQUIRED
 ENV PORT=3000
 ENV HOST=0.0.0.0
-RUN apk add --no-cache wget tini
+RUN apk upgrade --no-cache ca-certificates && apk add --no-cache wget tini
 # Bundle output
 COPY --from=build /app/apps/inbox-backend/dist ./dist
 # Prisma client + schema (needed at runtime for migrate deploy + queries)
