@@ -51,10 +51,25 @@ RUN apk add --no-cache brotli gzip && \
     find apps/landing/dist -type f \( -name '*.html' -o -name '*.js' -o -name '*.css' -o -name '*.svg' -o -name '*.json' -o -name '*.txt' \) -exec sh -c 'brotli -q 11 "$1" -o "$1.br" && gzip -k -9 "$1"' _ {} \;
 
 # Runtime stage — official Caddy on Alpine (chainguard caddy moved to paid tier 2026-Q1)
-FROM caddy:2-alpine
+# Caddy compilado aqui con la toolchain de Go del builder oficial: no hay imagen oficial de
+# Caddy con el Go parcheado (avisos de Go de oct-2026; caddy:2.11.7 trae Go 1.26.8). La guarda
+# falla el build si el Go resultante no es >= 1.27.3 o >= 1.26.10, para que un builder viejo
+# no vuelva a colar un binario vulnerable. Disparador para retirar esta etapa: cuando la imagen
+# oficial caddy:2.x-alpine publique Go >= 1.27.3 / 1.26.10, volver a `FROM caddy:<version>-alpine`.
+FROM caddy:2.11.7-builder AS caddy-build
+RUN xcaddy build v2.11.7
+RUN go_ver="$(/usr/bin/caddy build-info | awk '$1=="go"{print $2}')" && \
+    echo "caddy compilado con $go_ver" && \
+    printf '%s\n' "$go_ver" | grep -Eq '^go1\.(27\.([3-9]|[1-9][0-9])|(2[89]|[3-9][0-9])\.[0-9]+|26\.(1[0-9]|[2-9][0-9]))$' \
+      || { echo "Go $go_ver sin los parches requeridos (>= 1.27.3 o >= 1.26.10)" >&2; exit 1; }
+
+FROM caddy:2.11.7-alpine
+COPY --from=caddy-build /usr/bin/caddy /usr/bin/caddy
 RUN adduser -D -u 10001 -s /sbin/nologin nonroot
 COPY --from=build /app/apps/landing/dist /srv
 COPY infra/docker/Caddyfile.landing /etc/caddy/Caddyfile
+# El Caddyfile real debe ser valido con el binario recien compilado: si no, falla el build y no el arranque.
+RUN caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 CMD wget --quiet --spider http://localhost:8080/ || exit 1
 USER nonroot
