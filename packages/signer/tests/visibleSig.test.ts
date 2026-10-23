@@ -332,11 +332,11 @@ describe('signPdfPades — visible-sig rendering', () => {
     return hex.toLowerCase();
   }
 
-  // Solo los operandos hexadecimales de los Tj: el volcado completo también trae
-  // las coordenadas del QR, y el texto del QR (ahora largo) hace que aparezca «85»
-  // dentro de un número («6.85…») sin que haya elipsis. La elipsis viaja en un Tj.
-  function textHexOf(dump: string): string {
-    return [...dump.matchAll(/<([0-9a-f]+)>/g)].map((m) => m[1]).join('');
+  // Solo los operandos hexadecimales de los Tj, y BYTE a BYTE: el volcado completo también trae
+  // las coordenadas del QR y, si se concatena la cadena hex, «85» aparece a caballo entre dos bytes
+  // (p. ej. 0x58 0x58 → «5858») según los dígitos de la hora de la firma. La elipsis es el byte 0x85.
+  function tjBytesOf(dump: string): string[] {
+    return [...dump.matchAll(/<([0-9a-f]+)>/g)].flatMap((m) => m[1]!.match(/../g) ?? []);
   }
 
   async function stampTextOf(signerCN: string, width = 240, height = 72): Promise<string> {
@@ -379,7 +379,7 @@ describe('signPdfPades — visible-sig rendering', () => {
       expect(dump).toContain(winAnsiHex(word));
     }
     // Y no hay elipsis: repartir no es recortar.
-    expect(textHexOf(dump)).not.toContain(winAnsiHex('…'));
+    expect(tjBytesOf(dump)).not.toContain('85');
   });
 
   it('un nombre que SÍ cabe sale en una sola línea, sin cambiar nada', async () => {
@@ -387,7 +387,7 @@ describe('signPdfPades — visible-sig rendering', () => {
     expect(measureHelvetica(`Firmado por: ${cn}`, 8)).toBeLessThan(162); // premisa
     const dump = await stampTextOf(cn);
     expect(dump).toContain(winAnsiHex(`Firmado por: ${cn}`));
-    expect(textHexOf(dump)).not.toContain(winAnsiHex('…'));
+    expect(tjBytesOf(dump)).not.toContain('85');
   });
 
   it('un CN sin espacios que no cabe se recorta por ANCHO, con elipsis legible', async () => {
@@ -398,7 +398,7 @@ describe('signPdfPades — visible-sig rendering', () => {
     expect(dump).not.toContain(winAnsiHex(`Firmado por: ${longCN}`));
     // La elipsis viaja como 0x85 (WinAnsi). Con el `& 0xff` de antes salía 0x26,
     // es decir un '&' al final del nombre.
-    expect(textHexOf(dump)).toContain('85');
+    expect(tjBytesOf(dump)).toContain('85');
     expect(dump).not.toContain(winAnsiHex(`Firmado por: ${'X'.repeat(34)}`) + '26');
   });
 
