@@ -135,3 +135,34 @@ describe('fitQrPayload: el QR tiene que seguir siendo legible y la firma no pued
     expect(sizeOf(out)).toBeLessThanOrEqual(Math.floor(40 / MIN_QR_MODULE_PT));
   });
 });
+
+describe('subjectDnFromDer: atributos con nombre legible (cargo e identificador de organización)', () => {
+  // Certificado real de la ECI de Security Data/BCE: el cargo (2.5.4.12) y el identificador de la
+  // organización (2.5.4.97) salían con su número y el teléfono los subrayaba como si fueran enlaces.
+  it('2.5.4.12 sale como title y 2.5.4.97 como organizationIdentifier', async () => {
+    const forge = (await import('node-forge')).default;
+    const keys = forge.pki.rsa.generateKeyPair(1024);
+    const cert = forge.pki.createCertificate();
+    cert.publicKey = keys.publicKey;
+    cert.serialNumber = '01';
+    cert.validity.notBefore = new Date(Date.now() - 86_400_000);
+    cert.validity.notAfter = new Date(Date.now() + 86_400_000);
+    const subject = [
+      { shortName: 'C', value: 'EC' },
+      { name: 'organizationName', value: 'EMPRESA EJEMPLO S.A.S.' },
+      { type: '2.5.4.12', value: 'GERENTE GENERAL' },
+      { type: '2.5.4.4', value: 'APELLIDO PRUEBA' },
+      { type: '2.5.4.42', value: 'NOMBRE' },
+      { name: 'serialNumber', value: 'IDCEC-0000000000' },
+      { shortName: 'CN', value: 'NOMBRE APELLIDO PRUEBA' },
+      { type: '2.5.4.97', value: 'VATEC-0000000000001' },
+    ];
+    cert.setSubject(subject);
+    cert.setIssuer(subject);
+    cert.sign(keys.privateKey, forge.md.sha256.create());
+    const der = Uint8Array.from(Buffer.from(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes(), 'binary'));
+    expect(subjectDnFromDer(der)).toBe(
+      'C=EC, O=EMPRESA EJEMPLO S.A.S., title=GERENTE GENERAL, SN=APELLIDO PRUEBA, GN=NOMBRE, SERIALNUMBER=IDCEC-0000000000, CN=NOMBRE APELLIDO PRUEBA, organizationIdentifier=VATEC-0000000000001',
+    );
+  });
+});

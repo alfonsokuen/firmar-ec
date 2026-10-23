@@ -1,5 +1,10 @@
 # PWA changelog
 
+## 0.29.1 — 2026-10-22
+
+- QR de la estampa: el cargo (`2.5.4.12`) y el identificador de la organización (`2.5.4.97`) del DN del certificado salen ahora
+  como `title=` y `organizationIdentifier=` en vez de su número, que el teléfono subrayaba como si fueran enlaces. Firmador 0.13.1.
+
 ## 0.29.0 — 2026-10-22
 
 - El QR de la estampa de firma ahora muestra, al escanearlo, lo mismo que el de FirmaEC y Security Data: quién firmó, el DN completo del certificado, con qué se firmó y la fecha, más el enlace de verificación en su propia línea. Antes solo llevaba el enlace. El QR es un dato declarado por el firmante: no verifica el documento ni el certificado (eso lo hace el verificador).

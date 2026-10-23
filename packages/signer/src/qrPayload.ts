@@ -27,6 +27,8 @@ const DN_SHORT_NAMES: Record<string, string> = {
   '2.5.4.8': 'ST',
   '2.5.4.4': 'SN',
   '2.5.4.42': 'GN',
+  '2.5.4.12': 'title',
+  '2.5.4.97': 'organizationIdentifier',
 };
 
 /** Un campo del QR ocupa UNA línea: sin saltos ni caracteres de control. */
